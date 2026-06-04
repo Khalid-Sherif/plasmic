@@ -1,127 +1,53 @@
-# ---------------- Stage 1: Base ----------------
-FROM node:20-slim AS base
-RUN corepack enable && corepack prepare yarn@1.22.21 --activate
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash git python3 make build-essential postgresql-client rsync \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 --ingroup nodejs --shell /bin/bash appuser
-RUN chown -R appuser:nodejs /app
+# --- Build stage ---
+FROM node:24-alpine AS builder
+WORKDIR /plasmic
 
-# ---------------- Stage 2: Deps ----------------
-FROM base AS deps
-USER appuser
-WORKDIR /app
-ENV APP_USER_HOME=/home/appuser
-USER root
-RUN mkdir -p ${APP_USER_HOME}/.cache ${APP_USER_HOME}/.node/corepack && \
-    chown -R appuser:nodejs ${APP_USER_HOME}
-USER appuser
-ENV HOME=${APP_USER_HOME}
-COPY --chown=appuser:nodejs package.json yarn.lock pnpm-workspace.yaml ./
-COPY --chown=appuser:nodejs packages/ packages/
-COPY --chown=appuser:nodejs plasmicpkgs/ plasmicpkgs/
-COPY --chown=appuser:nodejs platform/ platform/
+RUN apk add --no-cache \
+    bash \
+    git \
+    curl \
+    wget \
+    python3 \
+    py3-pip \
+    postgresql-client \
+    build-base \
+    make \
+    jq
+
+# Copy only dependency files first for caching
+COPY package.json yarn.lock ./
+
+# Install root deps
 RUN yarn install --network-timeout 600000
 
-# ---------------- Stage 3: Builder ----------------
-FROM deps AS builder
-USER appuser
-WORKDIR /app
-COPY --chown=appuser:nodejs . .
-# Explicit installs for problematic packages
-WORKDIR /app/packages/loader-angular
-RUN yarn install --network-timeout 600000
-WORKDIR /app/packages/react-web-runtime
-RUN yarn install --network-timeout 600000
-WORKDIR /app/platform/host-test
-RUN yarn install --network-timeout 600000
-WORKDIR /app/platform/react-web-bundle
-RUN yarn install --network-timeout 600000
-WORKDIR /app/platform/live-frame
-RUN yarn install --network-timeout 600000
-WORKDIR /app/platform/loader-html-hydrate
-RUN yarn install --network-timeout 600000
-WORKDIR /app/platform/canvas-packages
-RUN yarn install --network-timeout 600000
-WORKDIR /app
+# Copy rest of the app
+COPY . .
 
-ENV NODE_OPTIONS=--max_old_space_size=4096
-RUN yarn add -D webpack@^5.76.0 webpack-cli@^6.0.1 webpack-dev-server@^4.15.1 \
-    webpack-merge@^5.9.0 copy-webpack-plugin@^6.0.3 awesome-typescript-loader@5.2.1 \
-    source-map-loader@^1.0.1 typescript@^5.0.0 tsdx@^0.14.1 tslib@^2.3.1 -W
+# Run setup steps individually to control memory usage
+ENV NODE_OPTIONS=--max_old_space_size=2048
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PUPPETEER_SKIP_DOWNLOAD=1
 
-ENV NODE_OPTIONS=--max_old_space_size=1024
-ENV NX_NO_CLOUD=true
-ENV NX_DAEMON=false
-RUN npx nx run-many --target=build --parallel=1 --concurrency=1
-WORKDIR /app/plasmicpkgs/commerce-providers/saleor
-RUN yarn install && yarn build || { echo "SALEOR BUILD FAILED WITH DETAILED ERRORS:"; cat /tmp/yarn-error.log || echo "No error log found"; }
+RUN yarn setup:sub && \
+    yarn setup:react-web-bundle && \
+    yarn setup:live-frame && \
+    yarn setup:loader-bundle-env && \
+    yarn setup:loader-html-hydrate && \
+    yarn setup:wab && \
+    yarn make
 
-WORKDIR /app
-RUN npx nx run canvas-packages:build --verbose || echo "Canvas packages build might have partial failures"
+RUN yarn cache clean
 
-RUN mkdir -p /app/platform/wab/public/static/js
-RUN cp /app/platform/loader-html-hydrate/build/* /app/platform/wab/public/static/js/ || echo "Warning: Some files might not have been copied, continuing build"
+# --- Final stage ---
+FROM node:24-alpine AS runtime
 
-WORKDIR /app/platform/wab
-RUN yarn install --network-timeout 600000
-RUN make
-RUN yarn build-css
-RUN yarn build
+RUN addgroup -S plasmic && \
+    adduser -S plasmic -G plasmic && \
+    apk add --no-cache git jq bash postgresql-client make
 
-# ---------------- Stage 4: Backend Runtime ----------------
-FROM base AS backend-runtime
-USER root
-# Create proper directory for corepack and set permissions
-RUN mkdir -p /home/appuser/.cache/node/corepack/v1 && \
-    chown -R appuser:nodejs /home/appuser/.cache
-USER appuser
-WORKDIR /app
-ENV HOME=/home/appuser
+USER plasmic
+WORKDIR /plasmic
 
-# Copy necessary production node_modules from deps stage
-COPY --chown=appuser:nodejs --from=deps /app/node_modules/ ./node_modules/
-# Copy necessary built code/assets from builder stage
-COPY --chown=appuser:nodejs --from=builder /app/package.json ./
-COPY --chown=appuser:nodejs --from=builder /app/packages/ ./packages/
-COPY --chown=appuser:nodejs --from=builder /app/plasmicpkgs/ ./plasmicpkgs/
-COPY --chown=appuser:nodejs --from=builder /app/platform/ ./platform/
+COPY --chown=plasmic:plasmic --from=builder /plasmic /plasmic
 
-# Copy entrypoint script
-COPY --chown=appuser:nodejs entrypoint-backend.sh /app/entrypoint-backend.sh
-RUN chmod +x /app/entrypoint-backend.sh
-
-# WORKDIR /app/platform/wab # This is set inside entrypoint now
-
-# DB setup commands moved to entrypoint script
-# RUN PGPASSWORD=$POSTGRES_PASSWORD psql ...
-# RUN yarn typeorm migration:run
-# RUN yarn plume:dev update
-
-USER appuser
-
-# Set default environment variables (overridden by Coolify/Compose)
-ENV NODE_ENV=production
-ENV PORT=3004
-# Define others needed by backend-server.bash
-
-ENTRYPOINT ["/app/entrypoint-backend.sh"]
-# CMD is now executed by the entrypoint script
-# CMD ["bash", "tools/backend-server.bash"]
-
-
-# ---------------- Stage 5: Frontend Runtime (Nginx) ----------------
-FROM nginx:1.25-alpine AS frontend-runtime
-
-# Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Copy built frontend assets from the builder stage
-COPY --from=builder /app/platform/wab/build /usr/share/nginx/html
-
-# Expose port 80 (Nginx default)
-EXPOSE 80
-
-# Nginx default CMD will start the server
+EXPOSE 3003 3004 3005
