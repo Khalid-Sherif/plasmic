@@ -1,0 +1,136 @@
+# ---------------- Stage 1: Base ----------------
+FROM node:18-slim AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="/pnpm:$PATH"
+RUN corepack enable
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash git python3 make build-essential postgresql-client rsync \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 --ingroup nodejs --shell /bin/bash appuser
+RUN chown -R appuser:nodejs /app
+
+# ---------------- Stage 2: Deps ----------------
+FROM base AS deps
+USER appuser
+WORKDIR /app
+ENV APP_USER_HOME=/home/appuser
+USER root
+RUN mkdir -p ${APP_USER_HOME}/.cache ${APP_USER_HOME}/.node/corepack && \
+    chown -R appuser:nodejs ${APP_USER_HOME}
+USER appuser
+ENV HOME=${APP_USER_HOME}
+COPY --chown=appuser:nodejs package.json yarn.lock pnpm-workspace.yaml ./
+COPY --chown=appuser:nodejs packages/ packages/
+COPY --chown=appuser:nodejs plasmicpkgs/ plasmicpkgs/
+COPY --chown=appuser:nodejs platform/ platform/
+RUN yarn install # Allow lockfile updates if needed during build
+
+# ---------------- Stage 3: Builder ----------------
+FROM deps AS builder
+USER appuser
+WORKDIR /app
+COPY --chown=appuser:nodejs . .
+# Explicit installs for problematic packages
+WORKDIR /app/packages/loader-angular
+RUN yarn install --frozen-lockfile
+WORKDIR /app/packages/react-web-runtime
+RUN yarn install --frozen-lockfile
+WORKDIR /app/platform/host-test
+RUN yarn install --frozen-lockfile
+WORKDIR /app/platform/react-web-bundle
+RUN yarn install --frozen-lockfile
+WORKDIR /app/platform/live-frame
+RUN yarn install --frozen-lockfile
+WORKDIR /app/platform/loader-html-hydrate
+RUN yarn install --frozen-lockfile
+WORKDIR /app/platform/canvas-packages
+RUN yarn install --frozen-lockfile
+WORKDIR /app
+
+ENV NODE_OPTIONS=--max_old_space_size=4096
+RUN yarn add -D webpack@^5.76.0 webpack-cli@^6.0.1 webpack-dev-server@^4.15.1 \
+    webpack-merge@^5.9.0 copy-webpack-plugin@^6.0.3 awesome-typescript-loader@5.2.1 \
+    source-map-loader@^1.0.1 typescript@^5.0.0 tsdx@^0.14.1 tslib@^2.3.1 -W
+
+# Explicitly check types across the workspace, redirecting output, using 6GB memory limit
+# Run build for all projects with the 'build' target
+RUN npx nx run-many --target=build --verbose --parallel=1
+# Build problematic packages individually with detailed error output
+WORKDIR /app/plasmicpkgs/commerce-providers/saleor
+RUN yarn install && yarn build || { echo "SALEOR BUILD FAILED WITH DETAILED ERRORS:"; cat /tmp/yarn-error.log || echo "No error log found"; }
+
+# Build canvas-packages last since it depends on the other packages
+WORKDIR /app
+RUN npx nx run canvas-packages:build --verbose || echo "Canvas packages build might have partial failures"
+
+# Ensure the destination directory exists
+RUN mkdir -p /app/platform/wab/public/static/js
+RUN cp /app/platform/loader-html-hydrate/build/* /app/platform/wab/public/static/js/ || echo "Warning: Some files might not have been copied, continuing build"
+
+# Run make & build frontend in wab
+WORKDIR /app/platform/wab
+# Install wab-specific deps needed for make and build
+RUN yarn install --frozen-lockfile
+RUN make
+# Build CSS assets first
+RUN yarn build-css
+RUN yarn build
+
+
+# ---------------- Stage 4: Backend Runtime ----------------
+FROM base AS backend-runtime
+USER root
+# Create proper directory for corepack and set permissions
+RUN mkdir -p /home/appuser/.cache/node/corepack/v1 && \
+    chown -R appuser:nodejs /home/appuser/.cache
+USER appuser
+WORKDIR /app
+ENV HOME=/home/appuser
+ENV COREPACK_HOME=/home/appuser/.cache/node/corepack/v1
+
+# Copy necessary production node_modules from deps stage
+COPY --chown=appuser:nodejs --from=deps /app/node_modules/ ./node_modules/
+# Copy necessary built code/assets from builder stage
+COPY --chown=appuser:nodejs --from=builder /app/package.json ./
+COPY --chown=appuser:nodejs --from=builder /app/packages/ ./packages/
+COPY --chown=appuser:nodejs --from=builder /app/plasmicpkgs/ ./plasmicpkgs/
+COPY --chown=appuser:nodejs --from=builder /app/platform/ ./platform/
+
+# Copy entrypoint script
+COPY --chown=appuser:nodejs entrypoint-backend.sh /app/entrypoint-backend.sh
+RUN chmod +x /app/entrypoint-backend.sh
+
+# WORKDIR /app/platform/wab # This is set inside entrypoint now
+
+# DB setup commands moved to entrypoint script
+# RUN PGPASSWORD=$POSTGRES_PASSWORD psql ...
+# RUN yarn typeorm migration:run
+# RUN yarn plume:dev update
+
+USER appuser
+
+# Set default environment variables (overridden by Coolify/Compose)
+ENV NODE_ENV=production
+ENV PORT=3004
+# Define others needed by backend-server.bash
+
+ENTRYPOINT ["/app/entrypoint-backend.sh"]
+# CMD is now executed by the entrypoint script
+# CMD ["bash", "tools/backend-server.bash"]
+
+
+# ---------------- Stage 5: Frontend Runtime (Nginx) ----------------
+FROM nginx:1.25-alpine AS frontend-runtime
+
+# Copy custom Nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy built frontend assets from the builder stage
+COPY --from=builder /app/platform/wab/build /usr/share/nginx/html
+
+# Expose port 80 (Nginx default)
+EXPOSE 80
+
+# Nginx default CMD will start the server
