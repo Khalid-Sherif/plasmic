@@ -26,25 +26,26 @@ COPY --chown=appuser:nodejs platform/ platform/
 RUN yarn install --network-timeout 600000
 
 # ---------------- Stage 3: Builder ----------------
+# ---------------- Stage 3: Builder ----------------
 FROM deps AS builder
 USER appuser
 WORKDIR /app
 COPY --chown=appuser:nodejs . .
 # Explicit installs for problematic packages
 WORKDIR /app/packages/loader-angular
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app/packages/react-web-runtime
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app/platform/host-test
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app/platform/react-web-bundle
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app/platform/live-frame
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app/platform/loader-html-hydrate
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app/platform/canvas-packages
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 WORKDIR /app
 
 ENV NODE_OPTIONS=--max_old_space_size=4096
@@ -52,27 +53,19 @@ RUN yarn add -D webpack@^5.76.0 webpack-cli@^6.0.1 webpack-dev-server@^4.15.1 \
     webpack-merge@^5.9.0 copy-webpack-plugin@^6.0.3 awesome-typescript-loader@5.2.1 \
     source-map-loader@^1.0.1 typescript@^5.0.0 tsdx@^0.14.1 tslib@^2.3.1 -W
 
-# Explicitly check types across the workspace, redirecting output, using 6GB memory limit
-# Run build for all projects with the 'build' target
 RUN npx nx run-many --target=build --verbose --parallel=1
-# Build problematic packages individually with detailed error output
 WORKDIR /app/plasmicpkgs/commerce-providers/saleor
 RUN yarn install && yarn build || { echo "SALEOR BUILD FAILED WITH DETAILED ERRORS:"; cat /tmp/yarn-error.log || echo "No error log found"; }
 
-# Build canvas-packages last since it depends on the other packages
 WORKDIR /app
 RUN npx nx run canvas-packages:build --verbose || echo "Canvas packages build might have partial failures"
 
-# Ensure the destination directory exists
 RUN mkdir -p /app/platform/wab/public/static/js
 RUN cp /app/platform/loader-html-hydrate/build/* /app/platform/wab/public/static/js/ || echo "Warning: Some files might not have been copied, continuing build"
 
-# Run make & build frontend in wab
 WORKDIR /app/platform/wab
-# Install wab-specific deps needed for make and build
-RUN yarn install --frozen-lockfile
+RUN yarn install --network-timeout 600000
 RUN make
-# Build CSS assets first
 RUN yarn build-css
 RUN yarn build
 
