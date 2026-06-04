@@ -3,7 +3,6 @@ set -e
 
 mkdir -p /app/.cache/node/corepack/v1
 export HOME=/app
-export COREPACK_HOME=/app/.cache/node/corepack/v1
 
 echo "Waiting for database connection..."
 retries=5
