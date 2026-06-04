@@ -1,63 +1,53 @@
+version: '3.8'
+
 services:
-  plasmic-db:
-    image: 'postgres:15'
-    restart: always
-    environment:
-      - 'POSTGRES_PASSWORD=${DB_PASSWORD}'
-      - 'POSTGRES_USER=${DB_USER}'
-      - 'POSTGRES_DB=${DB_NAME}'
-    ports:
-      - '5432:5432'
-    volumes:
-      - 'postgres_data:/var/lib/postgresql/data'
-      - './platform/wab/tools/docker-dev/db-setup.bash:/docker-entrypoint-initdb.d/db-setup.sh'
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'pg_isready -U ${DB_USER}'
-      interval: 5s
-      timeout: 10s
-      retries: 5
-  plasmic-wab:
+  wab-backend:
     build:
       context: .
-      dockerfile: ./platform/wab/tools/docker-dev/Dockerfile.dev.aio
-    command:
-      - "echo \"DATABASE_URI=postgres://${DB_USER}:${DB_PASSWORD}@plasmic-db:5432/${DB_NAME}\" > /plasmic/platform/wab/.env && \\\necho \"WAB_DBNAME=${DB_NAME}\" >> /plasmic/platform/wab/.env && \\\necho \"WAB_DBPASSWORD=${DB_PASSWORD}\" >> /plasmic/platform/wab/.env && \\\necho \"NODE_ENV=development\" >> /plasmic/platform/wab/.env && \\\njq '(.host = \"plasmic-db\") | (.password //= \"${DB_PASSWORD}\") | (.username //= \"${DB_USER}\") | (.database //= \"${DB_NAME}\")' ormconfig.json > tmp.json && mv tmp.json ormconfig.json && \\\nyarn typeorm migration:run && \\\nyarn seed && \\\ncd /plasmic && \\\nyarn dev\n"
-    volumes:
-      - '.:/plasmic'
-      - 'plasmic_node_modules:/plasmic/node_modules'
-      - 'plasmic_wab_node_modules:/plasmic/platform/wab/node_modules'
-      - 'plasmic_sub_node_modules:/plasmic/platform/sub/node_modules'
-      - 'plasmic_canvas_node_modules:/plasmic/platform/canvas-packages/node_modules'
-      - 'plasmic_live_frame_node_modules:/plasmic/platform/live-frame/node_modules'
-      - 'plasmic_react_web_bundle_node_modules:/plasmic/platform/react-web-bundle/node_modules'
-      - 'plasmic_loader_bundle_env_node_modules:/plasmic/platform/loader-bundle-env/node_modules'
-      - 'plasmic_loader_html_hydrate_node_modules:/plasmic/platform/loader-html-hydrate/node_modules'
-      - 'plasmic_public:/plasmic/platform/wab/public'
-      - 'plasmic_wab_client:/plasmic/platform/wab/src/wab/client'
-      - 'plasmic_wab_gen:/plasmic/platform/wab/src/wab/gen'
-      - 'plasmic_wab_shared_model:/plasmic/platform/wab/src/wab/shared/model'
-      - 'plasmic_generated_styles:/plasmic/platform/wab/src/wab/styles'
-      - 'plasmic_playwright_cache:/home/plasmic/.cache/ms-playwright'
-      - '/mnt/data/plasmic/secrets/secrets.json:/root/.plasmic/secrets.json:ro'
-    ports:
-      - '3003:3003'
-      - '3004:3004'
-      - '3005:3005'
-      - '9229:9229'
-    depends_on:
-      plasmic-db:
-        condition: service_healthy
+      dockerfile: Dockerfile.coolify
+      target: backend-runtime
+    restart: always
     environment:
-      - 'DATABASE_URI=postgres://${DB_USER}:${DB_PASSWORD}@plasmic-db:5432/${DB_NAME}'
-      - 'WAB_DBNAME=${DB_NAME}'
-      - 'WAB_DBPASSWORD=${DB_PASSWORD}'
-      - NODE_ENV=development
-      - 'POSTGRES_USER=${DB_USER}'
-      - CHOKIDAR_USEPOLLING=true
-    tty: true
-    stdin_open: true
+      NODE_ENV: production
+      PORT: 3004
+      DATABASE_URI: "postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}"
+      SESSION_SECRET: "${SESSION_SECRET}"
+      REACT_APP_PUBLIC_URL: "http://localhost"
+      HOST: "http://localhost"
+    networks:
+      - plasmic-net
+    depends_on:
+      - db
+
+  wab-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.coolify
+      target: frontend-runtime
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - wab-backend
+    networks:
+      - plasmic-net
+
+  db:
+    image: postgres:14-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    networks:
+      - plasmic-net
+    restart: always
+
+networks:
+  plasmic-net:
+    driver: bridge
+
 volumes:
   postgres_data:
     driver: local
@@ -65,87 +55,3 @@ volumes:
       type: none
       o: bind
       device: /mnt/data/plasmic/postgres_data
-  plasmic_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/node_modules
-  plasmic_wab_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/wab/node_modules
-  plasmic_sub_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/sub/node_modules
-  plasmic_canvas_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/canvas/node_modules
-  plasmic_live_frame_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/live-frame/node_modules
-  plasmic_react_web_bundle_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/react-web-bundle/node_modules
-  plasmic_loader_bundle_env_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/loader-bundle-env/node_modules
-  plasmic_loader_html_hydrate_node_modules:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/loader-html-hydrate/node_modules
-  plasmic_playwright_cache:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/playwright-cache
-  plasmic_public:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/public
-  plasmic_wab_client:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/wab/client
-  plasmic_wab_gen:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/wab/gen
-  plasmic_wab_shared_model:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/wab/shared-model
-  plasmic_generated_styles:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/wab/generated-styles
