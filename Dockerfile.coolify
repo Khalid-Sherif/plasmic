@@ -25,7 +25,7 @@ COPY --chown=appuser:nodejs package.json yarn.lock pnpm-workspace.yaml ./
 COPY --chown=appuser:nodejs packages/ packages/
 COPY --chown=appuser:nodejs plasmicpkgs/ plasmicpkgs/
 COPY --chown=appuser:nodejs platform/ platform/
-RUN yarn install # Allow lockfile updates if needed during build
+RUN yarn install --network-timeout 600000
 
 # ---------------- Stage 3: Builder ----------------
 FROM deps AS builder
