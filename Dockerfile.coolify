@@ -1,8 +1,6 @@
 # ---------------- Stage 1: Base ----------------
 FROM node:18-slim AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="/pnpm:$PATH"
-RUN corepack enable && corepack prepare yarn@stable --activate
+RUN npm install -g yarn@1.22.21
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash git python3 make build-essential postgresql-client rsync \
     && rm -rf /var/lib/apt/lists/*
@@ -88,7 +86,6 @@ RUN mkdir -p /home/appuser/.cache/node/corepack/v1 && \
 USER appuser
 WORKDIR /app
 ENV HOME=/home/appuser
-ENV COREPACK_HOME=/home/appuser/.cache/node/corepack/v1
 
 # Copy necessary production node_modules from deps stage
 COPY --chown=appuser:nodejs --from=deps /app/node_modules/ ./node_modules/
