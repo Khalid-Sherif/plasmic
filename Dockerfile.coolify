@@ -26,7 +26,6 @@ COPY --chown=appuser:nodejs platform/ platform/
 RUN yarn install --network-timeout 600000
 
 # ---------------- Stage 3: Builder ----------------
-# ---------------- Stage 3: Builder ----------------
 FROM deps AS builder
 USER appuser
 WORKDIR /app
@@ -68,7 +67,6 @@ RUN yarn install --network-timeout 600000
 RUN make
 RUN yarn build-css
 RUN yarn build
-
 
 # ---------------- Stage 4: Backend Runtime ----------------
 FROM base AS backend-runtime
