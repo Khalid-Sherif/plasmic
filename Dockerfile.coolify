@@ -24,7 +24,7 @@ RUN yarn install --network-timeout 600000
 COPY . .
 
 # Create a fake git repo so rsbuild.config.ts can run git rev-parse HEAD
-RUN git init && git add -A && git commit -m "build" --allow-empty
+RUN git init && git config --global user.email "build@plasmic.app" && git config --global user.name "Build" && git add -A && git commit -m "build" --allow-empty
 
 # Run setup steps individually to control memory usage
 ENV NODE_OPTIONS=--max_old_space_size=2048
