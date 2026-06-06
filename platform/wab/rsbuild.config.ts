@@ -128,7 +128,10 @@ export default defineConfig({
   dev: {
     // We write intermediate files to disk (build/) for debugging,
     // and also because our local host server will serve from there.
-    writeToDisk: publicUrl.includes("localhost") ? true : false,
+    // writeToDisk: publicUrl.includes("localhost") ? true : false,
+    writeToDisk: true,
+    hmr: false,
+    liveReload: false,
   },
   server: {
     port,
