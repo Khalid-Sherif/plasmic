@@ -166,7 +166,7 @@ export default defineConfig({
       css: true,
     },
   },
-  plugins: [pluginReact(), pluginLess(), pluginSass()],
+  plugins: [pluginReact(), pluginLess(), pluginSass(), pluginNodePolyfill()],
   tools: {
     // We use html-webpack-plugin directly instead of relying in @rsbuild/core
     // html plugin so it works with StudioHtmlPlugin.
