@@ -20,6 +20,7 @@ import {
   REQUIRED_VAR,
   mkDefinePluginOptsForEnv,
 } from "./tools/webpack/mkDefinePluginOptsForEnv";
+import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
 
 const commitHash = execSync("git rev-parse HEAD").toString().slice(0, 6);
 const buildEnv = process.env.NODE_ENV ?? "production";
