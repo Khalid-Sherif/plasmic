@@ -44,6 +44,9 @@ services:
       - DB_NAME=${DB_NAME}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SESSION_SECRET=${SESSION_SECRET}
+      - HOST=${PUBLIC_URL}
+      - BACKEND_HOST=${PUBLIC_URL}
+      - NEXT_PUBLIC_HOST=${PUBLIC_URL}
     tty: true
     stdin_open: true
 
