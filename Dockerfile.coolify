@@ -37,9 +37,10 @@ RUN yarn setup:sub && \
     yarn setup:loader-bundle-env && \
     yarn setup:loader-html-hydrate && \
     yarn setup:wab && \
+    yarn setup:canvas-packages && \
     yarn make
 
-RUN yarn cache clean
+RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
 
 # --- Final stage ---
 FROM node:24-alpine AS runtime
