@@ -41,6 +41,7 @@ RUN yarn setup:sub && \
     yarn make
 
 RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
+RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
 
 # --- Final stage ---
 FROM node:24-alpine AS runtime
