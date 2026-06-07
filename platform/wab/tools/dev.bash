@@ -1,7 +1,7 @@
 main() {
   concurrently \
   --names frontend,host,css,sub,canvas,react-web,live-frame,loader-html,backend \
-  'TRANSPILER=swc nice -n +30 yarn start' \
+  "PUBLIC_URL=$PUBLIC_URL TRANSPILER=swc nice -n +30 yarn start" \
   'yarn host-server' \
   'nice -n +30 yarn watch-css' \
   'cd ../sub/; yarn; nice -n +30 yarn watch' \
