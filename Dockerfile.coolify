@@ -72,5 +72,5 @@ CMD ["sh", "-c", "\
     yarn typeorm migration:run && \
     yarn seed && \
     cd /plasmic && \
-    yarn backend \
+    yarn dev \
 "]
