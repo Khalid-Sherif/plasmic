@@ -21,6 +21,9 @@ services:
       context: .
       dockerfile: Dockerfile.coolify
       target: runtime
+      args:
+        - PUBLIC_URL=${PUBLIC_URL}
+        - REACT_APP_DEFAULT_HOST_URL=${CANVAS_URL}
     restart: always
     ports:
       - 3003:3003
