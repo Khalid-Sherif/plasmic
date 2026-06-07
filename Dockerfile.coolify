@@ -36,14 +36,14 @@ ENV NODE_OPTIONS=--max_old_space_size=2048
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
-RUN yarn setup:sub && \
+RUN PUBLIC_URL=${PUBLIC_URL} yarn setup:sub && \
     yarn setup:react-web-bundle && \
     yarn setup:live-frame && \
     yarn setup:loader-bundle-env && \
     yarn setup:loader-html-hydrate && \
     yarn setup:wab && \
     yarn setup:canvas-packages && \
-    yarn make
+    PUBLIC_URL=${PUBLIC_URL} yarn make
 
 RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
 RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
