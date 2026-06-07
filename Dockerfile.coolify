@@ -72,8 +72,9 @@ CMD ["sh", "-c", "\
     echo \"WAB_DBNAME=$DB_NAME\" >> .env && \
     echo \"WAB_DBPASSWORD=$DB_PASSWORD\" >> .env && \
     echo \"NODE_ENV=development\" >> .env && \
+    echo \"PUBLIC_URL=$PUBLIC_URL\" >> .env && \
     yarn typeorm migration:run && \
     yarn seed && \
     cd /plasmic && \
-    yarn dev \
+    PUBLIC_URL=$PUBLIC_URL yarn dev \
 "]
