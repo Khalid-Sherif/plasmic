@@ -26,8 +26,6 @@ COPY . .
 # Create a fake git repo so rsbuild.config.ts can run git rev-parse HEAD
 RUN git init && git config --global user.email "build@plasmic.app" && git config --global user.name "Build" && git add -A && git commit -m "build" --allow-empty
 
-ARG REACT_APP_DEFAULT_HOST_URL
-ENV REACT_APP_DEFAULT_HOST_URL=${REACT_APP_DEFAULT_HOST_URL}
 ARG PUBLIC_URL
 ENV PUBLIC_URL=${PUBLIC_URL}
 
