@@ -34,7 +34,7 @@
     "setup:loader-html-hydrate": "cd platform/loader-html-hydrate && pnpm install && pnpm run build && cp build/* ../wab/public/static/js/",
     "setup:react-web-bundle": "cd platform/react-web-bundle && yarn && yarn build",
     "setup:sub": "cd platform/sub && yarn && yarn build",
-    "setup:wab": "cd platform && pnpm install",
+    "setup:wab": "cd platform/wab && pnpm install",
     "test": "vitest run --config vitest.root.ts $TEST_CWD",
     "test:types": "tstyche $TEST_CWD",
     "typecheck": "cd platform/wab && pnpm ts-watch",
