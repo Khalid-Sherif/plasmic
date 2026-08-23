@@ -30,7 +30,7 @@
     "setup-all": "pnpm setup && pnpm setup:canvas-packages && cd platform/wab && pnpm typeorm migration:run && pnpm migrate-dev-bundles && pnpm plume:dev update",
     "setup:canvas-packages": "cd platform/canvas-packages && pnpm install && pnpm run build",
     "setup:live-frame": "cd platform/live-frame && yarn && yarn build",
-    "setup:loader-bundle-env": "cd platform/loader-bundle-env && pnpm install && pnpm run build",
+    "setup:loader-bundle-env": "cd platform/loader-bundle-env && pnpm install",
     "setup:loader-html-hydrate": "cd platform/loader-html-hydrate && pnpm install && pnpm run build && cp build/* ../wab/public/static/js/",
     "setup:react-web-bundle": "cd platform/react-web-bundle && yarn && yarn build",
     "setup:sub": "cd platform/sub && yarn && yarn build",
