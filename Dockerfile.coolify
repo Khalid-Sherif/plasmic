@@ -42,7 +42,6 @@ RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
     PUBLIC_URL=${PUBLIC_URL} pnpm run setup:sub && \
     pnpm run setup:react-web-bundle && \
     pnpm run setup:live-frame && \
-    pnpm run setup:loader-html-hydrate && \
     pnpm run setup:wab && \
     pnpm run setup:canvas-packages && \
     PUBLIC_URL=${PUBLIC_URL} pnpm run make
