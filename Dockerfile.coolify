@@ -42,15 +42,17 @@ ENV NODE_OPTIONS=--max_old_space_size=2048
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
-# Run build steps explicitly to ensure yarn is used and avoid any hardcoded 'pnpm' in package.json scripts
+# Explicitly run yarn install AND yarn build in each directory.
+# This ensures local devDependencies (like webpack, rollup) are available,
+# bypassing any hardcoded 'pnpm' commands in your package.json scripts.
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
-    cd /plasmic/platform/sub && yarn build && \
-    cd /plasmic/platform/react-web-bundle && yarn build && \
-    cd /plasmic/platform/live-frame && yarn build && \
-    cd /plasmic/platform/loader-bundle-env && yarn build && \
-    cd /plasmic/platform/loader-html-hydrate && yarn build && cp build/* ../wab/public/static/js/ && \
+    cd /plasmic/platform/sub && yarn install && yarn build && \
+    cd /plasmic/platform/react-web-bundle && yarn install && yarn build && \
+    cd /plasmic/platform/live-frame && yarn install && yarn build && \
+    cd /plasmic/platform/loader-bundle-env && yarn install && yarn build && \
+    cd /plasmic/platform/loader-html-hydrate && yarn install && yarn build && cp build/* ../wab/public/static/js/ && \
     cd /plasmic/platform/wab && make && \
-    cd /plasmic/platform/canvas-packages && yarn build && \
+    cd /plasmic/platform/canvas-packages && yarn install && yarn build && \
     cd /plasmic && PUBLIC_URL=${PUBLIC_URL} yarn make
 
 RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
