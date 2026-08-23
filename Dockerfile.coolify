@@ -23,7 +23,7 @@ ENV COREPACK_ENABLE_STRICT=0
 # Copy dependency files first for caching
 COPY package.json yarn.lock pnpm-workspace.yaml ./
 
-# Install root deps (This installs the ENTIRE workspace and correctly links all binaries to the root node_modules/.bin)
+# Install root deps (installs the whole workspace and correctly links root binaries)
 RUN yarn install --network-timeout 600000
 
 # Copy rest of the app
@@ -42,19 +42,17 @@ ENV NODE_OPTIONS=--max_old_space_size=2048
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
-# Run build steps explicitly.
-# NOTE: We do NOT need to run 'yarn install' in sub-directories.
-# The root 'yarn install' already installed all workspace dependencies and hoisted binaries.
-# Running 'yarn build' in a workspace package automatically uses the root node_modules/.bin.
+# Use the package.json scripts.
+# Because we updated them in Step 1, they now use 'yarn' and have built-in 10-minute network timeouts.
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
-    cd /plasmic/platform/sub && yarn build && \
-    cd /plasmic/platform/react-web-bundle && yarn build && \
-    cd /plasmic/platform/live-frame && yarn build && \
-    cd /plasmic/platform/loader-bundle-env && yarn build && \
-    cd /plasmic/platform/loader-html-hydrate && yarn build && cp build/* ../wab/public/static/js/ && \
-    cd /plasmic/platform/wab && make && \
-    cd /plasmic/platform/canvas-packages && yarn build && \
-    cd /plasmic && PUBLIC_URL=${PUBLIC_URL} yarn make
+    PUBLIC_URL=${PUBLIC_URL} yarn setup:sub && \
+    yarn setup:react-web-bundle && \
+    yarn setup:live-frame && \
+    yarn setup:loader-bundle-env && \
+    yarn setup:loader-html-hydrate && \
+    yarn setup:wab && \
+    yarn setup:canvas-packages && \
+    PUBLIC_URL=${PUBLIC_URL} yarn make
 
 RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
 RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
