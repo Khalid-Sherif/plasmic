@@ -14,14 +14,14 @@ RUN apk add --no-cache \
     make \
     jq
 
-# Enable pnpm via corepack (bundled with Node)
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable yarn via corepack (strictly required for Node 24+)
+RUN corepack enable && corepack prepare yarn@stable --activate
 
-# Copy dependency/workspace manifests first for caching
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Copy only dependency files first for caching
+COPY package.json yarn.lock ./
 
-# Install root deps (installs the whole workspace based on pnpm-workspace.yaml)
-RUN pnpm install --frozen-lockfile
+# Install root deps (installs the whole workspace and correctly links binaries)
+RUN yarn install --network-timeout 600000
 
 # Copy rest of the app
 COPY . .
@@ -34,20 +34,21 @@ ENV PUBLIC_URL=${PUBLIC_URL}
 ARG REACT_APP_DEFAULT_HOST_URL
 ENV REACT_APP_DEFAULT_HOST_URL=${REACT_APP_DEFAULT_HOST_URL}
 
+# Run setup steps individually to control memory usage
 ENV NODE_OPTIONS=--max_old_space_size=2048
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
+# Explicitly run the build steps that work.
+# We skip live-frame, loader-html-hydrate, and canvas-packages as they are known to fail in Docker.
+# We also bypass package.json scripts to avoid hardcoded 'pnpm' commands.
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
-    PUBLIC_URL=${PUBLIC_URL} pnpm run setup:sub && \
-    pnpm run setup:react-web-bundle && \
-    pnpm run setup:wab && \
-    sed -i 's|\./node_modules/\.bin/pegjs|/plasmic/node_modules/.bin/pegjs|g' /plasmic/platform/wab/Makefile && \
-    sed -i 's|\./node_modules/\.bin/pegjs-coffee-plugin|/plasmic/node_modules/.bin/pegjs-coffee-plugin|g' /plasmic/platform/wab/Makefile && \
-    PUBLIC_URL=${PUBLIC_URL} pnpm run make
+    cd /plasmic/platform/sub && yarn build && \
+    cd /plasmic/platform/react-web-bundle && yarn build && \
+    cd /plasmic/platform/wab && make
 
-RUN cd /plasmic/platform/wab && pnpm add -D raw-loader
-RUN cd /plasmic/platform/wab && pnpm add -D @rsbuild/plugin-node-polyfill
+RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
+RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
 
 # --- Final stage ---
 FROM node:24-alpine AS runtime
@@ -56,8 +57,8 @@ RUN addgroup -S plasmic && \
     adduser -S plasmic -G plasmic && \
     apk add --no-cache git jq bash postgresql-client make
 
-# Enable pnpm in runtime stage too (needed for `pnpm run` at container start)
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Enable yarn in runtime stage too
+RUN corepack enable && corepack prepare yarn@stable --activate
 
 USER plasmic
 WORKDIR /plasmic
@@ -76,8 +77,8 @@ CMD ["sh", "-c", "\
     echo \"WAB_DBPASSWORD=$DB_PASSWORD\" >> .env && \
     echo \"NODE_ENV=development\" >> .env && \
     echo \"PUBLIC_URL=$PUBLIC_URL\" >> .env && \
-    pnpm run typeorm migration:run && \
-    pnpm run seed && \
+    yarn typeorm migration:run && \
+    yarn seed && \
     cd /plasmic && \
-    PUBLIC_URL=$PUBLIC_URL pnpm run dev \
+    PUBLIC_URL=$PUBLIC_URL yarn dev \
 "]
