@@ -3,6 +3,7 @@
 **/.idea/libraries/Generated_files.xml
 **/.idea/sqldialects.xml
 **/.idea/workspace.xml
+/Dockerfile-copy.coolify
 # Local .terraform directories
 **/.terraform/*
 **/.vscode/
