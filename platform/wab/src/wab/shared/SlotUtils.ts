@@ -1,5 +1,7 @@
-import { allSuccess } from "@/wab/commons/failable-utils";
 import { DeepReadonly } from "@/wab/commons/types";
+import { TplMgr } from "@/wab/shared/TplMgr";
+import { $$$ } from "@/wab/shared/TplQuery";
+import { VariantCombo, tryGetBaseVariantSetting } from "@/wab/shared/Variants";
 import { flattenComponent } from "@/wab/shared/cached-selectors";
 import { elementSchemaToTpl } from "@/wab/shared/code-components/code-components";
 import { toVarName } from "@/wab/shared/codegen/util";
@@ -12,11 +14,11 @@ import {
 } from "@/wab/shared/core/components";
 import { SlotSelection } from "@/wab/shared/core/slots";
 import { typographyCssProps } from "@/wab/shared/core/style-props";
+import { createExpandedRuleSetMerger } from "@/wab/shared/core/styles";
 import {
-  createExpandedRuleSetMerger,
-  THEMABLE_TAGS,
-} from "@/wab/shared/core/styles";
-import {
+  TplCodeComponent,
+  TplTagCodeGenType,
+  TplTextTag,
   ancestorsUpWithSlotSelections,
   flattenTpls,
   getTplOwnerComponent,
@@ -31,19 +33,13 @@ import {
   isTplTag,
   isTplTextBlock,
   isTplVariantable,
-  TplCodeComponent,
-  TplTagCodeGenType,
-  TplTextTag,
   tryGetOwnerSite,
 } from "@/wab/shared/core/tpls";
+import { isTagThemable } from "@/wab/shared/html";
 import { maybeComputedFn } from "@/wab/shared/mobx-util";
 import {
   Arg,
   Component,
-  isKnownRenderExpr,
-  isKnownTplComponent,
-  isKnownTplSlot,
-  isKnownVirtualRenderExpr,
   Param,
   RenderExpr,
   SlotParam,
@@ -54,15 +50,17 @@ import {
   Var,
   Variant,
   VirtualRenderExpr,
+  isKnownRenderExpr,
+  isKnownTplComponent,
+  isKnownTplSlot,
+  isKnownVirtualRenderExpr,
 } from "@/wab/shared/model/classes";
 import {
-  isRenderableType,
   isRenderFuncType,
+  isRenderableType,
 } from "@/wab/shared/model/model-util";
-import { TplMgr } from "@/wab/shared/TplMgr";
-import { $$$ } from "@/wab/shared/TplQuery";
-import { tryGetBaseVariantSetting, VariantCombo } from "@/wab/shared/Variants";
 import L from "lodash";
+import { Result } from "neverthrow";
 
 export function getSlotParams(component: Component) {
   return component.params.filter((p): p is SlotParam => isSlot(p));
@@ -357,7 +355,7 @@ export function isTypographyNode(tpl: TplNode): tpl is TplNode {
   ) {
     return true;
   } else if (isTplTag(tpl)) {
-    return THEMABLE_TAGS.includes(tpl.tag);
+    return isTagThemable(tpl.tag);
   } else {
     return false;
   }
@@ -530,8 +528,8 @@ export function fillCodeComponentDefaultSlotContent(
       component.codeComponentMeta.defaultSlotContents[prop];
     if (defaultContent) {
       const contents = ensureArray(defaultContent);
-      const tplContentsResults = allSuccess(
-        ...contents.map((elt) =>
+      const tplContentsResults = Result.combine(
+        contents.map((elt) =>
           elementSchemaToTpl(ownerSite, component, elt, {
             codeComponentsOnly: false,
             baseVariant: baseVariant,
@@ -539,13 +537,13 @@ export function fillCodeComponentDefaultSlotContent(
         )
       );
 
-      if (tplContentsResults.result.isError) {
+      if (tplContentsResults.isErr()) {
         console.log(
           `Error filling default slot contents for code component: `,
-          tplContentsResults.result.error
+          tplContentsResults.error
         );
       } else {
-        const tpls = tplContentsResults.result.value.map((x) => x.tpl);
+        const tpls = tplContentsResults.value.map((x) => x.tpl);
         $$$(tpl).setSlotArg(
           prop,
           new RenderExpr({

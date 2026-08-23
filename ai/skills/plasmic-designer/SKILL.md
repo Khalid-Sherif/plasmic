@@ -3,12 +3,12 @@ name: plasmic-designer
 description: Build and modify Plasmic Studio designs using copilot tools via Chrome DevTools MCP. First argument should be a project ID, followed by the design request. Use this skill whenever the user mentions Plasmic, Plasmic Studio, visual web builder, or asks to design, build, edit, or modify UI components, pages, sections, or layouts inside a Plasmic project. Also trigger when the user references a Plasmic project ID, wants to add/remove/restyle elements in a visual editor, or asks about Plasmic component props, variants, slots, or tokens — even if they don't say "Plasmic" explicitly but describe visual design work that implies it.
 allowed-tools: mcp__chrome-devtools__evaluate_script mcp__chrome-devtools__navigate_page mcp__chrome-devtools__take_screenshot mcp__chrome-devtools__list_pages
 metadata:
-  version: "1.0.0"
+  version: "1.3.0"
 ---
 
 # Plasmic Designer
 
-Skill Version: 1.0.0
+Skill Version: 1.3.0
 
 Control Plasmic Studio through Chrome DevTools MCP to build and modify production-ready interfaces.
 
@@ -26,32 +26,25 @@ The studio base URL is `https://studio.plasmic.app` by default. Only use `http:/
 
 1. **Navigate to the project** using `navigate_page` to open `{baseUrl}/projects/{projectId}/`
 
-2. **Wait for studio to load** — the studio takes a few seconds to initialize. Poll until the API is available:
+2. **Wait for studio to load and identify the session** — the studio takes a few seconds to initialize. Poll until `window.PLASMIC_AI_TOOLS` is available, then call `identify()` once, before any other tool.
 
    ```javascript
    async () => {
-     for (let i = 0; i < 15; i++) {
-       if (window.PLASMIC_AI_TOOLS) return { ready: true };
-       await new Promise((r) => setTimeout(r, 2000));
+     for (let i = 0; i < 30; i++) {
+       if (window.PLASMIC_AI_TOOLS) {
+         return await window.PLASMIC_AI_TOOLS.identify({
+           model: "<model>",
+           client: "<client>",
+           skill: "<skill>",
+           outputFormat: "<json|xml>",
+         });
+       }
+       await new Promise((r) => setTimeout(r, 1000));
      }
      return {
-       ready: false,
-       error: "Studio did not load. Check the project ID and dev server.",
+       success: false,
+       error: { message: "Studio failed to load." },
      };
-   };
-   ```
-
-   If `ready` is false, inform the user and stop.
-
-3. **Identify the session** — call `window.PLASMIC_AI_TOOLS.identify()` once before any other tool. All fields are required.
-
-   ```javascript
-   () => {
-     return window.PLASMIC_AI_TOOLS.identify({
-       model: "<model>",
-       client: "<client>",
-       skill: "<skill>",
-     });
    };
    ```
 
@@ -59,116 +52,89 @@ The studio base URL is `https://studio.plasmic.app` by default. Only use `http:/
 
    - `model` — Model name as known to the agent (e.g. `claude-opus-4-7`, `anthropic/claude-sonnet-4-6`, `gpt-5.3-codex`).
    - `client` — AI client/CLI invoking the tool (e.g. `claude-code`, `claude-code@1.x`, `opencode`, `cursor`, `cline`).
-   - `skill` — Skill name and version being used (e.g. `plasmic-designer@1.0.0`, `unknown`).
+   - `skill` — Skill name and version being used (e.g. `plasmic-designer@1.2.0`, `unknown`).
+   - `outputFormat` — Preferred format for tool output, `"json"` or `"xml"`.
 
-   Pass `"unknown"` for any field you cannot reliably identify.
+   Pass `"unknown"` for any required string field you cannot reliably identify.
+
+   If `success` is false, inform the user and stop.
 
 ## Workflow
 
 Follow an explore-first pattern for every request:
 
-1. **Understand** — Use `read` to inspect the current state before making changes. If the request could reuse existing components (buttons, cards, navbars), read available components first and prefer reusing them over creating new HTML.
-2. **Plan** — For complex requests, think through the sequence of operations before acting. Break large tasks into logical steps.
-3. **Execute** — Make changes using the appropriate tools.
-4. **Verify** — Use `take_screenshot` to visually confirm the result. Use `read` if you need to verify structural changes.
+1. **Understand** — `read` the current state before changing anything; prefer reusing existing components over new HTML.
+2. **Plan** — For complex requests, break the work into steps before acting.
+3. **Execute** — Make changes with the appropriate tools.
+4. **Verify** — `read` to confirm structural changes; Optionally, `take_screenshot` to confirm the result visually
 
-## API Reference
+## Using the tools
 
-All tools are called via `evaluate_script` using async arrow functions (the tools return Promises). Each returns `{ success: true, output: "..." }` or `{ success: false, error: { message: "...", type: "..." } }`.
+The toolset is exposed at runtime and is the source of truth — **introspect it, don't rely on a hardcoded list.** `_meta` is a `Record<string, CopilotToolMeta>` keyed by tool name:
 
-Check `success` on every call. On failure, read the error message — common causes are invalid UUIDs or elements that don't exist. If a UUID-related error occurs, re-read the component to get fresh UUIDs before retrying.
-
-### read — Inspect project data
-
-```javascript
-// Read all components and tokens
-async () => {
-  return await window.PLASMIC_AI_TOOLS.read({
-    project: {
-      components: true,
-      tokens: true,
-      screenBreakpoints: true,
-      globalVariants: true,
-    },
-  });
-};
-
-// Read a specific component
-async () => {
-  return await window.PLASMIC_AI_TOOLS.read({
-    components: ["<componentUuid>"],
-  });
-};
-
-// Read specific elements within a component
-async () => {
-  return await window.PLASMIC_AI_TOOLS.read({
-    elements: [
-      { componentUuid: "<componentUuid>", elementUuid: "<elementUuid>" },
-    ],
-  });
-};
-
-// Read specific tokens
-async () => {
-  return await window.PLASMIC_AI_TOOLS.read({ tokens: ["<tokenUuid>"] });
-};
+```ts
+interface CopilotToolMeta {
+  toolName: string;
+  title: string;
+  description: string;
+  inputSchema: JSONSchema7; // JSON Schema (draft-07)
+  outputSchema: JSONSchema7; // shape of a successful `output`
+}
 ```
 
-The output is often XML. Parse it to extract UUIDs, structure, props, variants, and slots. Large projects may return large results — read selectively by requesting specific components rather than everything.
-
-### insertHtml — Add HTML/CSS snippets
+Read it once with `evaluate_script` (return the object directly; `evaluate_script` serializes it for you), and treat each tool's `inputSchema` as authoritative for field names, required fields, enums, and nesting, and its `outputSchema` for what a result contains:
 
 ```javascript
-async () => {
-  return await window.PLASMIC_AI_TOOLS.insertHtml({
-    html: "<div class='section'>...</div>",
-    componentUuid: "<componentUuid>",
-    tplUuid: "<targetElementUuid>",
-    insertRelLoc: "append", // "before" | "prepend" | "append" | "after" | "wrap" | "replace"
-    // variantUuids: ["<variantUuid>"]  // optional, defaults to base variant
-  });
-};
+() => window.PLASMIC_AI_TOOLS._meta;
 ```
 
-After insertion, the browser canvas updates automatically.
-
-### changeElement — Rename elements and/or modify CSS
+Call a tool with an async arrow function (tools return Promises), passing one input object that conforms to its schema:
 
 ```javascript
-async () => {
-  return await window.PLASMIC_AI_TOOLS.changeElement({
-    componentUuid: "<componentUuid>",
-    // variantUuids: ["<variantUuid>"],  // optional
-    changes: [
-      {
-        tplUuid: "<elementUuid>",
-        // optional; pass null to remove the existing name
-        name: "HeroSection",
-        // optional; and null removes a property
-        styles: {
-          "background-color": "#1a1a2e",
-          padding: "48px 24px",
-          color: null,
-        },
-      },
-    ],
-  });
-};
+async () => await window.PLASMIC_AI_TOOLS.<toolName>({
+  /* fields per window.PLASMIC_AI_TOOLS._meta.<toolName>.inputSchema */
+});
 ```
 
-Each change entry can include a `name`, `styles`, or both.
+Every call resolves to a `CopilotToolCallResult`:
 
-### deleteElement — Remove an element
-
-```javascript
-async () => {
-  return await window.PLASMIC_AI_TOOLS.deleteElement({
-    componentUuid: "<componentUuid>",
-    tplUuid: "<elementUuid>",
-  });
-};
+```ts
+type CopilotToolCallResult =
+  | { success: true; output: string }
+  | {
+      success: false;
+      error: { message: string; type: "TOOL_NOT_FOUND" | "EXECUTION_FAILED" };
+    };
 ```
+
+Check `success` each time; on a UUID error, re-read for fresh UUIDs and retry.
+
+Call `read` before any mutation to get project structure and the UUIDs every other tool needs. Its output is usually XML: parse it for UUIDs, props, variants, and slots, and read selectively (specific components/elements) on large projects. After a successful mutation the canvas updates automatically.
+
+## Legacy Data Query Migration
+
+Only when asked. Legacy `$queries` run server-side via Plasmic's integration proxy, which
+applies its credentials, default headers, and role checks. New `$q` queries run
+`plasmic.fetch` from wherever the page renders, so none of that carries over. Migrate only
+the query the request names; for a component-wide request, assess every `legacyDataQueries`
+entry.
+
+1. **Read** the component (`legacyDataQueries`, `dataQueries`) and `project.customFunctions`.
+   For a query's types and values, read just its path:
+   `read({ dataContext: [{ componentUuid, paths: ["$queries.<name>"] }] })`.
+2. **Skip** any entry with `migratable: false` (report its `migrationBlockers`) or one a
+   `dataQueries` entry already replaces — likely when `references: 0`.
+3. **Create** the replacement with `createDataQuery`, bound to the Fetch custom function from
+   `project.customFunctions`, with the legacy op's `baseUrl` + path + params as its `opts.url`.
+   Carry over all legacy op args — a GraphQL op becomes `"method": "POST"` with
+   `"body": { "query": …, "variables": … }`, and the op's own `headers` arg becomes `opts.headers`.
+   Custom code only when no function fits. Keep dynamic parts as inline `{{ }}` rather than
+   the preview values you read, and never invent an endpoint, credential, header, or result.
+4. **Repoint** references with `migrateDataQuery`, deriving `subPathRewrites` from
+   `paths: ["$queries.<old>.data", "$q.<new>.data"]`. Verify with `paths: ["$q.<new>"]`.
+
+Report one line per query (migrated, or skipped and why), plus anything `migrateDataQuery`
+couldn't rewrite and the manual deletion of the legacy query.
 
 ## Components & Variants
 
@@ -178,24 +144,46 @@ Mutation tools require a `componentUuid` (from `read` results). They accept an o
 
 ### Reusing Existing Components
 
-When you read a component, the output includes **props** (text, boolean, enum, number, href with defaults), **variants** (boolean toggles or enum option groups), **slots** (named content areas), **base-variant-tpl-tree** (element tree with styles), and **VariantSettings** (style overrides per variant). Review these to understand the component before using it.
+When you read a component, review its props, variants, slots, element tree and per-variant style overrides before using it.
 
 To use a component in insertHtml:
 
 ```html
 <plasmic-component
-  data-plasmic-name="ComponentName"
+  data-plasmic-component="ComponentName"
+  data-plasmic-project="importedProjectId"
+  data-plasmic-name="primaryCta"
   data-props='{"propName":"value","variantGroup":"optionName"}'
   style="margin: 16px;"
 >
-  <div slot="slotName">Slot content here</div>
+  <slot name="slotName">Slot content here</slot>
 </plasmic-component>
 ```
 
-- `data-plasmic-name` must exactly match the component name from `read()` (case-sensitive).
+- `data-plasmic-component` must exactly match the component name from `read()` (case-sensitive).
+- `data-plasmic-project` (optional) is the id of the imported project the component comes from. Omit it for components in the current project; set it to use a component from an imported project.
+- `data-plasmic-name` (optional) names this component instance in the tree. It's a semantic name picked up by Plasmic codegen to override the element in the generated code.
 - `data-props` is a JSON object for both props and variant activations. Boolean variants: `"group": true`. Enum variants: `"group": "optionName"`.
-- `slot="slotName"` on direct children fills a named slot.
+- `<slot name="slotName">` children fill named slots; its children become the slot content.
 - **Only layout/position styles work on instances**: width, height, min/max sizing, margin, position, top/left/bottom/right, z-index, order, align-self, flex-grow/shrink, opacity, display (only `none`), transform, and transition properties. Background, padding, color, font, border, etc. are ignored on instances — use `changeElement` on the component's root element instead. This is a Plasmic platform constraint, not a preference.
+
+## Dynamic Data
+
+Text, attributes, and component props can be bound to runtime data — `$props`, `$state`, `$ctx` (page params/query), `$queries` / `$q` (data query results), and repetition locals (`currentItem`, `currentIndex`).
+
+- Write bindings as inline `{{ jsExpr }}` interpolation. Content is static by default; wrapping JS in `{{ }}` makes it dynamic (also used for non-string literals, e.g. `"{{ 10 }}"`).
+- Before binding, `read({ dataContext: [{ componentUuid, elementUuid }] })` to see which paths exist, then drill in with `paths` / `maxArrayItems`. Reference only paths it returns.
+- Repetition: `data-repeat="{{ $q.myQuery.data }}"` in `insertHtml`, or `repeat: { collection: "..." }` in `changeElement`; bind the subtree with `{{ currentItem.* }}`.
+- Visibility: `data-visible-if="{{ ... }}"` / `data-visibility="displayNone"`, or `visibility: { showIf: "..." }` in `changeElement`.
+- A prop wired to the enclosing component's prop reads back as `{{ $props.<name> }}`, and a link-to-page destination as its URL with dynamic parts inlined (e.g. `/products/{{ $state.slug }}`).
+
+## Interactions
+
+An element's event handler is an ordered list of interaction steps, surfaced by `read` under component `interactions` rather than in the element's props/attrs (a handler forwarded from a prop as `{{ $props.<name> }}`). Manage them with `createElementInteractions`, `changeElementInteractions`, and `deleteElementInteractions`.
+
+- `eventName` is a DOM event prop for tags (e.g. `onClick`) or the name of a function-typed prop for component instances (e.g. `On click`). Use the exact name `read` reports.
+- Prefer structured actions (`updateVariable`, `updateVariant`) over `customFunction` when one fits. Steps whose action kind is outside the writable action schema (e.g. navigation) are still listed by `read`, but can only be renamed or deleted.
+- Run-code bodies see `$state`, `$props`, `$ctx`, `$refs`, `$queries` / `$q` and the event args; later steps read earlier results as `$steps.<stepName>`.
 
 ## HTML Code Guidelines
 
@@ -203,9 +191,10 @@ Before generating HTML, read `references/html-constraints.md` for the full set o
 
 - Use `<style>` blocks with BEM-style class names instead of inline styles.
 - Use flex layout exclusively (Plasmic does not support CSS Grid).
-- Include `@media` queries for responsive breakpoints — read the project's breakpoints with `read({ project: { screenBreakpoints: true } })` first.
+- Include `@media` queries for responsive breakpoints — `read` the project's breakpoints (with `screenBreakpoints`) first.
 - Use Google Fonts (single name, no fallback lists).
 - Use inline SVG for icons, `https://placehold.co` for placeholder images.
+- `<slot-target name="slotName">default content</slot-target>` defines a named slot when building a reusable component; slots cannot be nested.
 - No JavaScript, no vendor prefixes, no `data:image/svg+xml`, no `currentColor`, no `:root`.
 
 ## Design Quality
@@ -214,7 +203,7 @@ Before generating designs, read `references/design-guidelines.md` for aesthetic 
 
 ## Design Tokens
 
-Read the project's tokens with `read()` before generating designs, then:
+Read the project's tokens before generating designs, then:
 
 - Prefer existing tokens over hardcoded values for consistency. Reference them as `var(--token-<uuid>)`.
 - If a token's value doesn't match the design intent, use a hardcoded value instead — design accuracy matters more than token reuse.

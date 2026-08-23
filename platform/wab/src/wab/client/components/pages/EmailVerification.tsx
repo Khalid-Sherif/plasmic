@@ -8,8 +8,7 @@ import MarkFullColorIcon from "@/wab/client/plasmic/plasmic_kit_design_system/Pl
 import { ApiUser, ConfirmEmailResponse } from "@/wab/shared/ApiSchema";
 import { spawn } from "@/wab/shared/common";
 import { APP_ROUTES } from "@/wab/shared/route/app-routes";
-import { fillRoute } from "@/wab/shared/route/route";
-import { Button, notification, Spin, Tooltip } from "antd";
+import { Button, Spin, Tooltip, notification } from "antd";
 import * as React from "react";
 
 interface EmailVerificationProps {
@@ -24,7 +23,7 @@ export function useEmailVerification(selfInfo: ApiUser) {
   const nextPath =
     continueToPath && isPlasmicPath(continueToPath)
       ? continueToPath
-      : fillRoute(APP_ROUTES.orgCreation, {});
+      : APP_ROUTES.orgCreation.fill({});
 
   const token = new URL(location.href).searchParams.get("token") ?? "";
 
@@ -151,16 +150,23 @@ export function EmailVerification(props: EmailVerificationProps) {
                 No email in your inbox or spam folder? Let’s
                 <LinkButton
                   onClick={async () => {
-                    showEmailSentNotification();
-                    if (!selfInfo.isFake) {
-                      await nonAuthCtx.api.sendEmailVerification({
-                        email: selfInfo.email,
-                        nextPath,
+                    try {
+                      if (!selfInfo.isFake) {
+                        await nonAuthCtx.api.sendEmailVerification({
+                          email: selfInfo.email,
+                          nextPath,
+                        });
+                      } else {
+                        await nonAuthCtx.api.forgotPassword({
+                          email: selfInfo.email,
+                        });
+                      }
+                      showEmailSentNotification();
+                    } catch (err) {
+                      notification.error({
+                        message: "Failed to send email. Please try again.",
                       });
-                    } else {
-                      await nonAuthCtx.api.forgotPassword({
-                        email: selfInfo.email,
-                      });
+                      throw err;
                     }
                   }}
                 >

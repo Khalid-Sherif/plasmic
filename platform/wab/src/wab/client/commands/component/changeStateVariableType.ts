@@ -1,17 +1,16 @@
 import { getComponentStatesContext } from "@/wab/client/commands/context-utils";
 import { choicePrompt, Command } from "@/wab/client/commands/types";
-import { codeLit } from "@/wab/shared/core/exprs";
 import {
-  getDefaultValueForStateVariableType,
   getStateVarName,
-  STATE_VARIABLE_TYPES,
-  StateVariableType,
+  NORMAL_STATE_VARIABLE_TYPES,
+  NormalStateVariableType,
 } from "@/wab/shared/core/states";
 import { State } from "@/wab/shared/model/classes";
+import { ok } from "neverthrow";
 
 export const changeStateVariableTypeCommand: Command<
   {
-    type: StateVariableType | null;
+    type: NormalStateVariableType | null;
   },
   {
     state: State;
@@ -25,7 +24,7 @@ export const changeStateVariableTypeCommand: Command<
       description: "Change state variable type for a given component",
       args: {
         type: choicePrompt({
-          options: STATE_VARIABLE_TYPES.map((type) => ({
+          options: NORMAL_STATE_VARIABLE_TYPES.map((type) => ({
             id: type,
             label: type,
             value: type,
@@ -36,16 +35,13 @@ export const changeStateVariableTypeCommand: Command<
   },
   context: getComponentStatesContext,
   execute: async (studioCtx, { type }, { state }) => {
-    return await studioCtx.change(({ success }) => {
+    return await studioCtx.change(() => {
       if (type && type !== state.variableType) {
         studioCtx.siteOps().updateState(state, {
           variableType: type,
         });
-        state.param.defaultExpr = codeLit(
-          getDefaultValueForStateVariableType(type)
-        );
       }
-      return success();
+      return ok();
     });
   },
 };

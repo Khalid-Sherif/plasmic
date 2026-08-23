@@ -1,5 +1,5 @@
 import { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
-import { IFailable } from "ts-failable";
+import { Result } from "neverthrow";
 
 export type Prompt<T, Config extends object = {}> = {
   _type: "text" | "number" | "boolean" | "choice";
@@ -46,8 +46,8 @@ export function choicePrompt<T>(
 }
 
 export type CommandMeta<Args = unknown> = {
-  // Args were introduced for Omnibar integration to derive UI metadata for
-  // a given arg. This could also come in handy in cases where a tool call would
+  // Args were introduced to derive UI metadata for a given arg when
+  // rendering command inputs. This could also come in handy in cases where a tool call would
   // require human approval so we can show UI for respective args.
   args: { [K in keyof Args]: Prompt<Args[K]> };
   id: string;
@@ -61,8 +61,8 @@ export type ContextFunc<C> = (studioCtx: StudioCtx) => C[];
 export interface Command<
   Args = unknown,
   Context = unknown,
-  Result = void,
-  Error = never
+  T = void,
+  E = never
 > {
   meta: (
     context: Context & {
@@ -74,7 +74,7 @@ export interface Command<
     studioCtx: StudioCtx,
     args: Args,
     context: Context
-  ) => Promise<IFailable<Result, Error>>;
+  ) => Promise<Result<T, E>>;
 }
 
 // type-utils

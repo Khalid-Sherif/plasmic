@@ -112,6 +112,7 @@ import {
   extractParamsFromPagePath,
   findStateForParam,
   getComponentDisplayName,
+  getComponentForVariantGroup,
   getFolderComponentDisplayName,
   getSubComponents,
   isCodeComponent,
@@ -137,6 +138,7 @@ import {
   upgradeProjectDeps,
   walkDependencyTree,
 } from "@/wab/shared/core/project-deps";
+import { serverQueryId } from "@/wab/shared/core/query-ids";
 import {
   ensureScreenVariantsOrderOnMatrices,
   getAllSiteFrames,
@@ -247,7 +249,6 @@ import {
   VariantsRef,
   ensureKnownEventHandler,
   ensureKnownVariantGroup,
-  ensureKnownVariantsRef,
   isKnownArenaFrame,
   isKnownComponent,
   isKnownEventHandler,
@@ -256,6 +257,7 @@ import {
   isKnownStyleToken,
   isKnownTheme,
   isKnownTplNode,
+  isKnownVarRef,
   isKnownVariantsRef,
 } from "@/wab/shared/model/classes";
 import { typeFactory } from "@/wab/shared/model/model-util";
@@ -300,6 +302,11 @@ export function ensureBaseVariant(comp: Component) {
     comp.variants.push(mkBaseVariant());
   }
   return comp.variants[0];
+}
+
+export interface VariantGroupMultiUpdateFailure {
+  tpl: TplComponent;
+  arg: Arg;
 }
 
 export const getTplComponentArg = (
@@ -888,24 +895,48 @@ export class TplMgr {
     removeComponentState(this.site(), component, state);
   }
 
-  updateVariantGroupMulti(group: VariantGroup, multi: boolean) {
+  updateVariantGroupMulti(
+    group: VariantGroup,
+    multi: boolean
+  ): VariantGroupMultiUpdateFailure | undefined {
     if (group.multi === multi) {
       return;
     }
 
     // Convert all existing TplComponent.args referencing this variant group between
     // single value and array value
+    const argsToUpdate: Array<{ arg: Arg; variantsRef: VariantsRef }> = [];
     for (const [vs, tpl] of this.findAllVariantSettings({ ordered: false })) {
       if (isTplComponent(tpl)) {
         for (const arg of vs.args) {
           if (arg.param !== group.param) {
             continue;
           }
-          const r = ensureKnownVariantsRef(arg.expr);
-          const adjustedVariants = multi ? r.variants : r.variants.slice(0, 1);
-          arg.expr = mkVariantGroupArgExpr(adjustedVariants);
+          if (isKnownVarRef(arg.expr)) {
+            // Skip linked (VarRef) because the user will manually trigger the re-conciliation
+            continue;
+          }
+
+          if (!isKnownVariantsRef(arg.expr)) {
+            // This arg sets the variant dynamically, so we can't tell how many variants it resolves to.
+            if (!multi) {
+              // multi -> single refused, because we can't guarantee
+              // that the user's custom code resolves to at most one variant
+              return { tpl, arg };
+            }
+            continue;
+          }
+
+          argsToUpdate.push({ arg, variantsRef: arg.expr });
         }
       }
+    }
+
+    for (const { arg, variantsRef } of argsToUpdate) {
+      const adjustedVariants = multi
+        ? variantsRef.variants
+        : variantsRef.variants.slice(0, 1);
+      arg.expr = mkVariantGroupArgExpr(adjustedVariants);
     }
     group.multi = multi;
 
@@ -924,6 +955,8 @@ export class TplMgr {
         }
       }
     }
+
+    return undefined;
   }
 
   updateScreenVariantQuery(variant: Variant, query: string) {
@@ -1234,6 +1267,10 @@ export class TplMgr {
     if (queries.length > 0) {
       this.clearReferencesToRemovedQueries(queries.map((q) => q.uuid));
     }
+    const serverQueries = comps.flatMap((c) => c.serverQueries);
+    if (serverQueries.length > 0) {
+      this.fixReferencesToRemovedServerQueries(serverQueries);
+    }
   }
 
   clearReferencesToRemovedQueries(removedQueries: string[] | string) {
@@ -1274,7 +1311,53 @@ export class TplMgr {
     query: ComponentServerQuery
   ) {
     arrayRemove(component.serverQueries, query);
-    this.clearReferencesToRemovedQueries(query.uuid);
+    this.fixReferencesToRemovedServerQueries([query]);
+  }
+
+  /**
+   * Custom function invalidations are tied to an arbitrary server query using it,
+   * so when a server query is removed, its QueryRefs are moved to another surviving
+   * query with the same invalidation id (if any).
+   */
+  private fixReferencesToRemovedServerQueries(
+    removedQueries: ComponentServerQuery[]
+  ) {
+    const survivingQueries = this.site().components.flatMap(
+      (c) => c.serverQueries
+    );
+    const removedUuidToReplacement = new Map(
+      withoutNils(
+        removedQueries.map((removed) => {
+          const id = serverQueryId(removed);
+          const replacement = id
+            ? survivingQueries.find((q) => serverQueryId(q) === id)
+            : undefined;
+          return replacement
+            ? ([removed.uuid, replacement] as const)
+            : undefined;
+        })
+      )
+    );
+    const removedUuids = new Set(removedQueries.map((q) => q.uuid));
+    const queryInvalidationExprs = findQueryInvalidationExprWithRefs(
+      this.site(),
+      [...removedUuids]
+    );
+    queryInvalidationExprs.forEach(({ expr }) => {
+      expr.invalidationQueries = withoutNils(
+        expr.invalidationQueries.map((key) => {
+          if (isString(key) || !removedUuids.has(key.ref.uuid)) {
+            return key;
+          }
+          const replacement = removedUuidToReplacement.get(key.ref.uuid);
+          if (!replacement) {
+            return undefined;
+          }
+          key.ref = replacement;
+          return key;
+        })
+      );
+    });
   }
 
   renameArena(arena: Arena, name: string) {
@@ -2160,7 +2243,7 @@ export class TplMgr {
 
     if (group.type === VariantGroupType.Component) {
       const component = ensure(
-        this.site().components.find((c) => c.variantGroups.includes(group)),
+        getComponentForVariantGroup(this.site(), group),
         "Expected some component to contain the given variant group"
       );
       this.renameParam(component, group.param, name || "Unnamed Group");

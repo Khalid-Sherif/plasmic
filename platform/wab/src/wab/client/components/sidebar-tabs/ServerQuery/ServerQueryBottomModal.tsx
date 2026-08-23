@@ -15,7 +15,6 @@ import {
   TplNode,
   isKnownComponentServerQuery,
 } from "@/wab/shared/model/classes";
-import { PlasmicQueryDataProvider } from "@plasmicapp/query";
 import { observer } from "mobx-react";
 import * as React from "react";
 
@@ -24,10 +23,10 @@ import * as React from "react";
  * This is useful when computing the environment for a query's own expression preview.
  */
 export function omitQueryFromEnv(
-  env: Record<string, any> | undefined,
+  env: Record<string, any>,
   query: ComponentServerQuery | { name: string }
-): Record<string, any> | undefined {
-  if (env?.$q) {
+): Record<string, any> {
+  if (env.$q) {
     const { $q, ...restEnv } = env;
     const currentKey = toVarName(query.name);
     const { [currentKey]: _omit, ...filteredQueries } = $q;
@@ -117,43 +116,41 @@ const ServerQueryOpExprBottomModalContent = observer(
       [onSave]
     );
 
-    // Server query modal gets its own isolated cache so it doesn't interfere
-    // with the cache in the current canvas.
-    const swrCache = React.useMemo(() => new Map<string, unknown>(), []);
+    const { env, currGlobalThis } = (() => {
+      if (!viewCtx || !tpl) {
+        return { env: undefined, currGlobalThis: undefined };
+      }
 
-    const env = (() => {
-      const computedEnv =
-        viewCtx && tpl
-          ? extractDataCtx(
-              viewCtx,
-              tpl,
-              undefined,
-              interaction,
-              eventHandlerKey
-            )
-          : undefined;
+      let computedEnv: Record<string, any> = extractDataCtx(
+        viewCtx,
+        tpl,
+        undefined,
+        interaction,
+        eventHandlerKey
+      );
       // Exclude the current query from $q to avoid circular references
       if (parentQuery) {
-        return omitQueryFromEnv(computedEnv, parentQuery);
+        computedEnv = omitQueryFromEnv(computedEnv, parentQuery);
       }
-      return computedEnv;
+      return {
+        env: computedEnv,
+        currGlobalThis: viewCtx.canvasCtx.win(),
+      };
     })();
-
     return (
       <PopoverFrameProvider containerSelector=".bottom-modals">
-        <PlasmicQueryDataProvider provider={() => swrCache}>
-          <ServerQueryOpExprFormAndPreview
-            value={value}
-            onSave={wrappedOnSave}
-            onCancel={onCancel}
-            env={env}
-            schema={schema}
-            readOnly={readOnly}
-            allowedOps={allowedOps}
-            exprCtx={exprCtx}
-            interaction={interaction}
-          />
-        </PlasmicQueryDataProvider>
+        <ServerQueryOpExprFormAndPreview
+          value={value}
+          onSave={wrappedOnSave}
+          onCancel={onCancel}
+          env={env}
+          currGlobalThis={currGlobalThis}
+          schema={schema}
+          readOnly={readOnly}
+          allowedOps={allowedOps}
+          exprCtx={exprCtx}
+          interaction={interaction}
+        />
       </PopoverFrameProvider>
     );
   }

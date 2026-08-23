@@ -13,6 +13,7 @@ import {
   loadDepPackages,
   unbundlePkgVersion,
 } from "@/wab/server/db/DbBundleLoader";
+import { getSerializableConnectionOptions } from "@/wab/server/db/DbCon";
 import {
   DbMgr,
   ProjectRevisionError,
@@ -179,14 +180,14 @@ import {
 import fetch from "node-fetch";
 import * as Prettier from "prettier";
 import type { SetRequired } from "type-fest";
-import { EntityManager, MigrationExecutor, getConnection } from "typeorm";
+import { EntityManager, MigrationExecutor } from "typeorm";
 
 export function mkApiProject(project: Project): ApiProject {
   const team = project.workspace?.team
     ? mkApiTeam(project.workspace.team)
     : null;
   return {
-    ...omit(project, "workspace"),
+    ...omit(project, "workspace", "secretApiToken"),
     workspaceName: project.workspace?.name || null,
     parentTeamId: team?.parentTeamId || null,
     teamId: project.workspace?.teamId || null,
@@ -1082,7 +1083,7 @@ async function importFullProjectData(
   if (tmpBranch) {
     await mgr.deleteBranch(tmpBranch.id);
   }
-  await mgr.maybeUpdateCommitGraphForProject(newProject.id, (graph) => {
+  await mgr.updateCommitGraphForProject(newProject.id, (graph) => {
     graph.branches = Object.fromEntries(
       withoutNils(
         Object.entries(projectData.commitGraph.branches).map(
@@ -1568,10 +1569,6 @@ export async function getProjectRev(req: Request, res: Response) {
     owner = await mgr.tryGetUserById(project.createdById);
   }
   const latestRevisionSynced = await getLatestRevisionSynced(mgr, projectId);
-  // Make sure this revision bundle is up to date.
-  if (!dontMigrateProject) {
-    await getMigratedBundle(rev);
-  }
 
   const appAuthConfig = await mgr.getPublicAppAuthConfig(projectId);
   const hasAppAuth = !!appAuthConfig;
@@ -1703,8 +1700,13 @@ export async function updateProject(req: Request, res: Response) {
       },
       data.regenerateSecretApiToken
     );
+    // Only return the secret token to callers who asked to regenerate it, which
+    // requires "editor". Returning it on every update would leak it to "content"
+    // collaborators who renames the project.
     const regeneratedSecretApiToken: string | undefined =
-      project.secretApiToken ?? undefined;
+      data.regenerateSecretApiToken
+        ? project.secretApiToken ?? undefined
+        : undefined;
 
     req.promLabels.projectId = project.id;
     const apiProject = mkApiProject(project);
@@ -1994,8 +1996,9 @@ export async function listUnpublishedProjectRevisions(
     : undefined;
 
   const pkg = await mgr.getPkgByProjectId(projectId);
+  // tryGetPkgVersion to avoid throwing when the branch has no published pkg version yet
   const latest = pkg
-    ? await mgr.getPkgVersion(pkg.id, undefined, undefined, {
+    ? await mgr.tryGetPkgVersion(pkg.id, undefined, undefined, {
         branchId,
       })
     : null;
@@ -2232,7 +2235,7 @@ export async function getPkgVersionPublishStatus(req: Request, res: Response) {
         }
       } catch (e) {
         // if we catch an error while decoding the url, we are going to consider that
-        // that the redirection is succesful The exception is going to be sent to
+        // that the redirection is successful The exception is going to be sent to
         // sentry
         isRedirectingToLatest = true;
         Sentry.captureException(e);
@@ -2362,7 +2365,7 @@ export async function revertToVersion(req: Request, res: Response) {
     });
 
     // Update commit graph
-    await mgr.maybeUpdateCommitGraphForProject(projectId, (dag) => {
+    await mgr.updateCommitGraphForProject(projectId, (dag) => {
       dag.branches[branchId ?? MainBranchId] = pkgVersion.id;
     });
 
@@ -2620,7 +2623,7 @@ export async function genCode(req: Request, res: Response) {
     req.workerpool.exec("codegen", [
       {
         scheme,
-        connectionOptions: getConnection().options,
+        connectionOptions: getSerializableConnectionOptions(),
         projectId: project.id,
         exportOpts: exportOpts,
         componentIdOrNames: req.body.componentIdOrNames,
@@ -2862,11 +2865,11 @@ export async function updateProjectData(req: Request, res: Response) {
         codeComponentsOnly: false,
       });
 
-      if (maybeError.result.isError) {
-        throw new BadRequestError(maybeError.result.error.message);
+      if (maybeError.isErr()) {
+        throw new BadRequestError(maybeError.error.message);
       }
 
-      const { tpl, warnings: componentWarnings } = maybeError.result.value;
+      const { tpl, warnings: componentWarnings } = maybeError.value;
       componentWarnings.forEach((err) =>
         warnings.push({
           message:

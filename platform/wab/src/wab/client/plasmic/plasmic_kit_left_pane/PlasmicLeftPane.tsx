@@ -31,7 +31,6 @@ import LeftComponentsPanel from "../../components/sidebar/LeftComponentsPanel"; 
 import LeftGeneralDataTokensPanel from "../../components/sidebar/LeftGeneralDataTokensPanel"; // plasmic-import: WwK9TyWdjIfT/component
 import LeftGeneralTokensPanel from "../../components/sidebar/LeftGeneralTokensPanel"; // plasmic-import: bDbzY5jXLz/component
 import LeftLintIssuesPanel from "../../components/sidebar/LeftLintIssuesPanel"; // plasmic-import: xymZo1AIeU/component
-import LeftPagesPanel from "../../components/sidebar/LeftPagesPanel"; // plasmic-import: wXKvVcr82I/component
 import LeftSettingsPanel from "../../components/sidebar/LeftSettingsPanel"; // plasmic-import: EeT-6P6YTW/component
 import LeftSplitsPanel from "../../components/sidebar/LeftSplitsPanel"; // plasmic-import: OzaoSbFLbl/component
 import { MixinsPanel as LeftMixinsPanel } from "../../components/sidebar/MixinControls"; // plasmic-import: ZsFxxgE4E8/component
@@ -45,7 +44,7 @@ import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-impor
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import projectcss from "../PP__plasmickit_left_pane.module.css"; // plasmic-import: aukbrhkegRkQ6KizvhdUPT/projectcss
+import "../PP__plasmickit_left_pane.css"; // plasmic-import: aukbrhkegRkQ6KizvhdUPT/projectcss
 import sty from "./PlasmicLeftPane.module.css"; // plasmic-import: avrERxAp81S/css
 
 import GearIcon from "../plasmic_kit/PlasmicIcon__Gear"; // plasmic-import: ZmVZmXEc9f_SR/icon
@@ -128,7 +127,6 @@ export type PlasmicLeftPane__OverridesType = {
   leftImportsPanel?: Flex__<typeof LeftImportsPanel>;
   leftVersionsPanel?: Flex__<typeof LeftVersionsPanel>;
   leftComponentsPanel?: Flex__<typeof LeftComponentsPanel>;
-  leftPagesPanel?: Flex__<typeof LeftPagesPanel>;
   leftSettingsPanel?: Flex__<typeof LeftSettingsPanel>;
   leftSplitsPanel?: Flex__<typeof LeftSplitsPanel>;
   leftLintIssuesPanel?: Flex__<typeof LeftLintIssuesPanel>;
@@ -197,15 +195,17 @@ function PlasmicLeftPane__RenderFunc(props: {
         path: "type",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.type,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) => $props.type,
       },
     ],
     [$props, $ctx, $refs]
   );
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
     $queries: {},
+    $q: {},
     $refs,
   });
 
@@ -218,10 +218,10 @@ function PlasmicLeftPane__RenderFunc(props: {
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
       className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
+        "all",
+        "root_reset_aukbrhkegRkQ6KizvhdUPT",
+        "plasmic_default_styles",
+        "plasmic_mixins",
         styleTokensClassNames,
         sty.root,
         {
@@ -245,7 +245,7 @@ function PlasmicLeftPane__RenderFunc(props: {
             className={classNames("__wab_instance", sty.helpGroup)}
             icon={
               <HelpCircleSvgIcon
-                className={classNames(projectcss.all, sty.svg__zDP)}
+                className={classNames("all", sty.svg__zDP)}
                 role={"img"}
               />
             }
@@ -259,7 +259,7 @@ function PlasmicLeftPane__RenderFunc(props: {
               className={classNames("__wab_instance", sty.lint)}
               icon={
                 <WarningTriangleSvgIcon
-                  className={classNames(projectcss.all, sty.svg__zOfU0)}
+                  className={classNames("all", sty.svg__zOfU0)}
                   role={"img"}
                 />
               }
@@ -271,7 +271,7 @@ function PlasmicLeftPane__RenderFunc(props: {
               className={classNames("__wab_instance", sty.outline)}
               icon={
                 <TreeIcon
-                  className={classNames(projectcss.all, sty.svg__sSj6U)}
+                  className={classNames("all", sty.svg__sSj6U)}
                   role={"img"}
                 />
               }
@@ -283,7 +283,7 @@ function PlasmicLeftPane__RenderFunc(props: {
               className={classNames("__wab_instance", sty.assets)}
               icon={
                 <ComponentsSvgIcon
-                  className={classNames(projectcss.all, sty.svg___2I0R2)}
+                  className={classNames("all", sty.svg___2I0R2)}
                   role={"img"}
                 />
               }
@@ -295,7 +295,7 @@ function PlasmicLeftPane__RenderFunc(props: {
               className={classNames("__wab_instance", sty.settingsGroup)}
               icon={
                 <GearIcon
-                  className={classNames(projectcss.all, sty.svg__otRy1)}
+                  className={classNames("all", sty.svg__otRy1)}
                   role={"img"}
                 />
               }
@@ -307,7 +307,7 @@ function PlasmicLeftPane__RenderFunc(props: {
               className={classNames("__wab_instance", sty.more)}
               icon={
                 <DotsHorizontalCircleSvgIcon
-                  className={classNames(projectcss.all, sty.svg___52RoI)}
+                  className={classNames("all", sty.svg___52RoI)}
                   role={"img"}
                 />
               }
@@ -350,7 +350,7 @@ function PlasmicLeftPane__RenderFunc(props: {
       <div
         data-plasmic-name={"paneContainer"}
         data-plasmic-override={overrides.paneContainer}
-        className={classNames(projectcss.all, sty.paneContainer, {
+        className={classNames("all", sty.paneContainer, {
           [sty.paneContainertype_components]: hasVariant(
             $state,
             "type",
@@ -387,7 +387,7 @@ function PlasmicLeftPane__RenderFunc(props: {
         <div
           data-plasmic-name={"paneContent"}
           data-plasmic-override={overrides.paneContent}
-          className={classNames(projectcss.all, sty.paneContent, {
+          className={classNames("all", sty.paneContent, {
             [sty.paneContenttype_animationSequences]: hasVariant(
               $state,
               "type",
@@ -612,30 +612,6 @@ function PlasmicLeftPane__RenderFunc(props: {
               })}
             />
           ) : null}
-          {(
-            hasVariant($state, "type", "settings")
-              ? true
-              : hasVariant($state, "type", "pages")
-              ? true
-              : false
-          ) ? (
-            <LeftPagesPanel
-              data-plasmic-name={"leftPagesPanel"}
-              data-plasmic-override={overrides.leftPagesPanel}
-              className={classNames("__wab_instance", sty.leftPagesPanel, {
-                [sty.leftPagesPaneltype_pages]: hasVariant(
-                  $state,
-                  "type",
-                  "pages"
-                ),
-                [sty.leftPagesPaneltype_settings]: hasVariant(
-                  $state,
-                  "type",
-                  "settings"
-                ),
-              })}
-            />
-          ) : null}
           <LeftSettingsPanel
             data-plasmic-name={"leftSettingsPanel"}
             data-plasmic-override={overrides.leftSettingsPanel}
@@ -732,7 +708,6 @@ const PlasmicDescendants = {
     "leftImportsPanel",
     "leftVersionsPanel",
     "leftComponentsPanel",
-    "leftPagesPanel",
     "leftSettingsPanel",
     "leftSplitsPanel",
     "leftLintIssuesPanel",
@@ -765,7 +740,6 @@ const PlasmicDescendants = {
     "leftImportsPanel",
     "leftVersionsPanel",
     "leftComponentsPanel",
-    "leftPagesPanel",
     "leftSettingsPanel",
     "leftSplitsPanel",
     "leftLintIssuesPanel",
@@ -782,7 +756,6 @@ const PlasmicDescendants = {
     "leftImportsPanel",
     "leftVersionsPanel",
     "leftComponentsPanel",
-    "leftPagesPanel",
     "leftSettingsPanel",
     "leftSplitsPanel",
     "leftLintIssuesPanel",
@@ -797,7 +770,6 @@ const PlasmicDescendants = {
   leftImportsPanel: ["leftImportsPanel"],
   leftVersionsPanel: ["leftVersionsPanel"],
   leftComponentsPanel: ["leftComponentsPanel"],
-  leftPagesPanel: ["leftPagesPanel"],
   leftSettingsPanel: ["leftSettingsPanel"],
   leftSplitsPanel: ["leftSplitsPanel"],
   leftLintIssuesPanel: ["leftLintIssuesPanel"],
@@ -826,7 +798,6 @@ type NodeDefaultElementType = {
   leftImportsPanel: typeof LeftImportsPanel;
   leftVersionsPanel: typeof LeftVersionsPanel;
   leftComponentsPanel: typeof LeftComponentsPanel;
-  leftPagesPanel: typeof LeftPagesPanel;
   leftSettingsPanel: typeof LeftSettingsPanel;
   leftSplitsPanel: typeof LeftSplitsPanel;
   leftLintIssuesPanel: typeof LeftLintIssuesPanel;
@@ -912,7 +883,6 @@ export const PlasmicLeftPane = Object.assign(
     leftImportsPanel: makeNodeComponent("leftImportsPanel"),
     leftVersionsPanel: makeNodeComponent("leftVersionsPanel"),
     leftComponentsPanel: makeNodeComponent("leftComponentsPanel"),
-    leftPagesPanel: makeNodeComponent("leftPagesPanel"),
     leftSettingsPanel: makeNodeComponent("leftSettingsPanel"),
     leftSplitsPanel: makeNodeComponent("leftSplitsPanel"),
     leftLintIssuesPanel: makeNodeComponent("leftLintIssuesPanel"),

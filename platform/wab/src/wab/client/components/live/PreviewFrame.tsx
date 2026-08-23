@@ -28,13 +28,15 @@ import {
   isInteractionLoc,
 } from "@/wab/shared/core/exprs";
 import { getDedicatedArena } from "@/wab/shared/core/sites";
-import { getPublicUrl } from "@/wab/shared/urls";
+import { getPublicUrl, getStaticBaseUrl } from "@/wab/shared/urls";
 import { autorun } from "mobx";
 import { observer } from "mobx-react";
 import React from "react";
 import { useMountedState, usePreviousDistinct } from "react-use";
 
-const frameHash = `#live=true&origin=${encodeURIComponent(getPublicUrl())}`;
+const frameHash =
+  `#live=true&origin=${encodeURIComponent(getPublicUrl())}` +
+  `&staticBaseUrl=${encodeURIComponent(getStaticBaseUrl())}`;
 
 interface PreviewFrameProps {
   previewCtx: PreviewCtx;
@@ -287,6 +289,20 @@ export const PreviewFrame = observer(function PreviewFrame(
   const adjustPreviewSize = () => {
     if (!previewCtx.component) {
       return;
+    }
+    if (!previousComponent) {
+      // Initial load: the URL (from getUrlsForLiveMode or a shared preview
+      // link) may already specify an explicit viewport size; respect it and
+      // only default to the arena frame size when it doesn't. Otherwise this
+      // races the URL-driven viewport and can clobber it with stale
+      // dimensions. (This race predates the react-router removal; it just
+      // resolved in the URL's favor on some environments.)
+      const hashParams = new URLSearchParams(
+        previewCtx.hostFrameCtx.history.location.hash.replace(/^#/, "")
+      );
+      if (hashParams.has("width") || hashParams.has("height")) {
+        return;
+      }
     }
     if (
       previousComponent &&

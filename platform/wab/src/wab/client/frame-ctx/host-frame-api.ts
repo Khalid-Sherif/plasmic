@@ -1,9 +1,14 @@
+import type {
+  MentionableResource,
+  MentionableResourceKind,
+} from "@/wab/client/components/copilot/resource-mention-utils";
 import {
   PublishResult,
   StudioAppUser,
 } from "@/wab/client/studio-ctx/StudioCtx";
 import { ApiBranch, BranchId } from "@/wab/shared/ApiSchema";
 import { PkgVersionInfoMeta } from "@/wab/shared/SharedApi";
+import type { AiOutputFormat } from "@/wab/shared/copilot/copilot-tool-types";
 import { ChangeLogEntry, SemVerReleaseType } from "@/wab/shared/site-diffs";
 import { LeftTabKey } from "@/wab/shared/ui-config-utils";
 import { ExtendedKeyboardEvent } from "mousetrap";
@@ -54,6 +59,17 @@ export type HostFrameApi = {
     toolName: string,
     toolArgs: Record<string, unknown>
   ): Promise<CopilotToolCallResult>;
+  /** Store the AI agent's preferred copilot tool output format on StudioCtx. */
+  setPreferredAiOutputFormat(format: AiOutputFormat): Promise<void>;
+  /** Resolves once the studio and its active canvas are ready. */
+  waitForStudioReady(): Promise<void>;
+  listMentionableResources(): Promise<MentionableResource[]>;
+  /** Labels of `@<…>` mentions whose resource no longer exists. */
+  findMissingMentions(text: string): Promise<string[]>;
+  navigateToMentionedResource(
+    kind: MentionableResourceKind,
+    uuid: string
+  ): Promise<void>;
 };
 
 /** Structured error for copilot tool calls — Comlink-serializable. */
@@ -72,18 +88,3 @@ export type CopilotToolCallResult =
       success: false;
       error: CopilotToolCallError;
     };
-
-/** Convert an unknown caught copilot error value into a human-readable error message. */
-export function serializeCopilotError(err: unknown): string {
-  if (err instanceof Error) {
-    return err.message || err.name || "Unknown error";
-  }
-  if (typeof err === "string") {
-    return err;
-  }
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
-  }
-}

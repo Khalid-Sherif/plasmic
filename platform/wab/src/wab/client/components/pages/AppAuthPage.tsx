@@ -12,16 +12,15 @@ import { LinkButton, Spinner } from "@/wab/client/components/widgets";
 import { Icon } from "@/wab/client/components/widgets/Icon";
 import { useAppCtx } from "@/wab/client/contexts/AppContexts";
 import MarkFullColorIcon from "@/wab/client/plasmic/plasmic_kit_design_system/PlasmicIcon__MarkFullColor";
+import { useLocation } from "@/wab/client/route/HistoryProvider";
 import { trackEvent } from "@/wab/client/tracking";
 import { ApiUser } from "@/wab/shared/ApiSchema";
 import { MAX_PASSWORD_LENGTH } from "@/wab/shared/password-policy";
 import { APP_ROUTES } from "@/wab/shared/route/app-routes";
-import { fillRoute } from "@/wab/shared/route/route";
 import { getPublicUrl } from "@/wab/shared/urls";
-import { Button, Divider, Input, notification, Spin, Tooltip } from "antd";
+import { Button, Divider, Input, Spin, Tooltip, notification } from "antd";
 import $ from "jquery";
 import React from "react";
-import { useLocation } from "react-router";
 const LazyPasswordStrengthBar = React.lazy(
   () => import("@/wab/client/components/PasswordStrengthBar")
 );
@@ -311,7 +310,7 @@ export function AppAuthForm({
                 content: "Unexpected error occurred logging in.",
               });
             }}
-            googleAuthUrl={fillRoute(APP_ROUTES.googleAuth, {})}
+            googleAuthUrl={APP_ROUTES.googleAuth.fill({})}
           >
             {mode === "sign in" ? "Sign in with Google" : "Sign up with Google"}
           </GoogleSignInButton>
@@ -489,19 +488,26 @@ export function AppEmailVerification(props: {
                 No email in your inbox or spam folder? Let’s
                 <LinkButton
                   onClick={async () => {
-                    showEmailSentNotification();
-                    if (!selfInfo.isFake) {
-                      await nonAuthCtx.api.sendEmailVerification({
-                        email: selfInfo.email,
-                        nextPath: emailVerificationPath,
-                        appName,
+                    try {
+                      if (!selfInfo.isFake) {
+                        await nonAuthCtx.api.sendEmailVerification({
+                          email: selfInfo.email,
+                          nextPath: emailVerificationPath,
+                          appName,
+                        });
+                      } else {
+                        await nonAuthCtx.api.forgotPassword({
+                          email: selfInfo.email,
+                          appName,
+                          nextPath: emailVerificationPath,
+                        });
+                      }
+                      showEmailSentNotification();
+                    } catch (err) {
+                      notification.error({
+                        message: "Failed to send email. Please try again.",
                       });
-                    } else {
-                      await nonAuthCtx.api.forgotPassword({
-                        email: selfInfo.email,
-                        appName,
-                        nextPath: emailVerificationPath,
-                      });
+                      throw err;
                     }
                   }}
                 >
@@ -555,16 +561,25 @@ export function AppForgotPasswordForm({
             e.preventDefault();
             const { email } = $(e.target).serializeJSON();
             setSubmitting(true);
-            await nonAuthCtx.api.forgotPassword({
-              email: email.trim(),
-              appName,
-              nextPath: emailResetPasswordPath,
-            });
-            setFeedback({
-              type: "success",
-              content: "Success! Check your email for instructions.",
-            });
-            setSubmitting(false);
+            try {
+              await nonAuthCtx.api.forgotPassword({
+                email: email.trim(),
+                appName,
+                nextPath: emailResetPasswordPath,
+              });
+              setFeedback({
+                type: "success",
+                content: "Success! Check your email for instructions.",
+              });
+            } catch (err) {
+              setFeedback({
+                type: "error",
+                content: "Unexpected error occurred. Please try again.",
+              });
+              throw err;
+            } finally {
+              setSubmitting(false);
+            }
           }}
         >
           <FormFeedback feedback={feedback} />

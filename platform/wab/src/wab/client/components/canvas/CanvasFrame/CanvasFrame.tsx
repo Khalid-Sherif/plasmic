@@ -38,12 +38,13 @@ import {
 import { DEVFLAGS } from "@/wab/shared/devflags";
 import { Pt } from "@/wab/shared/geom";
 import { ArenaFrame } from "@/wab/shared/model/classes";
-import { getPublicUrl } from "@/wab/shared/urls";
+import { getPublicUrl, getStaticBaseUrl } from "@/wab/shared/urls";
 import { Spin } from "antd";
 import $ from "jquery";
 import L from "lodash";
 import { reaction } from "mobx";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMountedState, useUnmount } from "react-use";
@@ -386,9 +387,9 @@ export const CanvasFrame = observer(function CanvasFrame({
       return;
     }
     spawn(
-      studioCtx.change(({ success }) => {
+      studioCtx.change(() => {
         studioCtx.setStudioFocusOnFrame({ frame: arenaFrame });
-        return success();
+        return ok();
       })
     );
   }, [studioCtx]);
@@ -397,9 +398,9 @@ export const CanvasFrame = observer(function CanvasFrame({
       return;
     }
     spawn(
-      studioCtx.change(({ success }) => {
+      studioCtx.change(() => {
         studioCtx.setStudioFocusOnlyOnFrame(arenaFrame);
-        return success();
+        return ok();
       })
     );
   }, [studioCtx]);
@@ -439,13 +440,13 @@ export const CanvasFrame = observer(function CanvasFrame({
   };
 
   const stopMove = async () => {
-    await studioCtx.change(({ success }) => {
+    await studioCtx.change(() => {
       if (dragMoveManager.current) {
         dragMoveManager.current.endDrag();
         dragMoveManager.current = undefined;
       }
       studioCtx.setIsDraggingObject(false);
-      return success();
+      return ok();
     });
   };
 
@@ -454,7 +455,7 @@ export const CanvasFrame = observer(function CanvasFrame({
       const viewport = iframeRef.current;
       spawn(
         (async () => {
-          const html = await studioCtx.hostPageHtml;
+          const html = await studioCtx.fetchHostPageHtml();
           const doc = ensure(
             viewport.contentDocument,
             () => "Expected contentDocument to exist"
@@ -487,10 +488,82 @@ export const CanvasFrame = observer(function CanvasFrame({
             })();
           `;
 
+          // Artboard iframes have no network response, so PerformanceNavigationTiming
+          // looks like a bfcache restore. transferSize, responseStart and encodedBodySize
+          // are all 0 and deliveryType is "cache". In Next 16 the React debug channel reads
+          // these, thinks it was restored from cache, and calls location.reload() which
+          // orphans the artboard and leaves it blank. We spoof PerformanceNavigationTiming
+          // to avoid this.
+          //
+          // Different Next versions key off different fields (as of July 2026):
+          //   transferSize === 0                     -> reload  (16.2.7 - 16.2.10, wasServedFromCache)
+          //   responseStart === 0 && responseEnd > 0 -> reload  (canary, "Safari tab-duplication" branch)
+          //   deliveryType === "cache"               -> reload  (canary)
+          const spoofFreshNavigationTimingScript = `
+            (() => {
+              if (typeof PerformanceNavigationTiming === "undefined") return;
+              const proto = PerformanceNavigationTiming.prototype;
+              const spoof = (prop, value) => {
+                try {
+                  Object.defineProperty(proto, prop, { configurable: true, get: () => value });
+                } catch (e) {}
+              };
+              spoof("transferSize", 1);
+              spoof("encodedBodySize", 1);
+              spoof("responseStart", 1);
+              spoof("deliveryType", "");
+            })();
+          `;
+
+          // Stub dev-server HMR connections to avoid replacing the document written by
+          // Studio. Next 12+ and Turbopack use WebSocket; webpack-hot-middleware (Gatsby)
+          // uses EventSource. Runs before the framework boots.
+          //
+          // Next 16 uses the React debug channel over its HMR socket, and won't
+          // hydrate without it. So we connect it and deliver only those messages.
+          const disableHmrScript = `
+            (() => {
+              const isHmr = (url) => /[^a-zA-Z]hmr($|[^a-zA-Z])/.test(url);
+              const isNextHmr = (url) => /\\/_next\\/(webpack-)?hmr(\\?|$)/.test(url);
+              window.EventSource = class extends EventSource {
+                constructor(url, config) {
+                  if (isHmr(url)) {
+                    return { onerror() {}, onmessage() {}, onopen() {}, close() {} };
+                  }
+                  super(url, config);
+                }
+              };
+              window.WebSocket = class extends WebSocket {
+                constructor(url, protocols) {
+                  if (isHmr(url) && !isNextHmr(url)) {
+                    return { addEventListener() {}, removeEventListener() {}, send() {}, close() {}, readyState: 3 };
+                  }
+                  super(url, protocols);
+                  if (!isNextHmr(url)) {
+                    return;
+                  }
+                  let onmessage = null;
+                  this.addEventListener("message", (event) => {
+                    const data = event.data;
+                    if (data instanceof ArrayBuffer && new Uint8Array(data)[0] === 0) {
+                      onmessage?.call(this, event);
+                    }
+                  });
+                  Object.defineProperty(this, "onmessage", {
+                    get: () => onmessage,
+                    set: (fn) => (onmessage = fn),
+                  });
+                }
+              };
+            })();
+          `;
+
           const finalHtml = html.replace(
             headRegexp,
             `$&
             <script>
+              ${spoofFreshNavigationTimingScript}
+              ${disableHmrScript}
               ${gatsbyDevModeServiceWorkerFixScript}
 
               window.history.replaceState({}, "", "${
@@ -562,6 +635,7 @@ export const CanvasFrame = observer(function CanvasFrame({
     const hash = new URLSearchParams({
       canvas: "true",
       origin: getPublicUrl(),
+      staticBaseUrl: getStaticBaseUrl(),
       componentName: toClassName(arenaFrame.container.component.name),
       globalVariants: JSON.stringify(activeGlobalVariants),
       interactive: `${studioCtx.isInteractiveMode}`,

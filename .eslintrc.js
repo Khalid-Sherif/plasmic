@@ -1,4 +1,4 @@
-const TYPES = `Animation|AnimationSequence|AnyType|Arena|ArenaChild|ArenaFrame|ArenaFrameCell|ArenaFrameGrid|ArenaFrameRow|Arg|ArgType|BindingStruct|BoolType|Choice|ClassNamePropType|CodeComponentHelper|CodeComponentMeta|CodeComponentVariantMeta|CodeLibrary|CollectionExpr|ColorPropType|ColumnsConfig|ColumnsSetting|Component|ComponentArena|ComponentDataQuery|ComponentInstance|ComponentServerQuery|ComponentSwapSplitContent|ComponentTemplateInfo|ComponentVariantGroup|ComponentVariantSplitContent|CompositeExpr|CustomCode|CustomFunction|CustomFunctionExpr|DataSourceOpExpr|DataSourceTemplate|DataToken|DateRangeStrings|DateString|DefaultStylesClassNamePropType|DefaultStylesPropType|EventHandler|Expr|ExprText|FigmaComponentMapping|FunctionArg|FunctionExpr|FunctionType|GenericEventHandler|GlobalVariantGroup|GlobalVariantGroupParam|GlobalVariantSplitContent|HostLessPackageInfo|HrefType|ImageAsset|ImageAssetRef|Img|Interaction|KeyFrame|LabeledSelector|MapExpr|Marker|Mixin|NameArg|NamedState|NodeMarker|Num|ObjectPath|PageArena|PageHref|PageMeta|Param|PlumeInfo|PlumeInstance|PrimitiveType|ProjectDependency|PropParam|QueryData|QueryInvalidationExpr|QueryRef|RandomSplitSlice|RawText|RenderExpr|RenderFuncType|RenderableType|Rep|RichText|Rule|RuleSet|Scalar|SegmentSplitSlice|SelectorRuleSet|Site|SlotParam|Split|SplitContent|SplitSlice|State|StateChangeHandlerParam|StateParam|StrongFunctionArg|StyleExpr|StyleMarker|StyleNode|StylePropType|StyleScopeClassNamePropType|StyleToken|StyleTokenOverride|StyleTokenRef|TargetType|TemplatedString|Text|Theme|ThemeLayoutSettings|ThemeStyle|Token|TplComponent|TplNode|TplRef|TplSlot|TplTag|Var|VarRef|Variant|VariantGroup|VariantGroupState|VariantSetting|VariantedRuleSet|VariantedValue|VariantsRef|VirtualRenderExpr`;
+const TYPES = `Animation|AnimationSequence|AnyType|Arena|ArenaChild|ArenaFrame|ArenaFrameCell|ArenaFrameGrid|ArenaFrameRow|Arg|ArgType|BindingStruct|BoolType|Choice|ClassNamePropType|CodeComponentHelper|CodeComponentMeta|CodeComponentVariantMeta|CodeLibrary|CollectionExpr|ColorPropType|ColumnsConfig|ColumnsSetting|Component|ComponentArena|ComponentDataQuery|ComponentInstance|ComponentServerQuery|ComponentSwapSplitContent|ComponentTemplateInfo|ComponentVariantGroup|ComponentVariantSplitContent|CompositeExpr|CustomCode|CustomFunction|CustomFunctionExpr|DataSourceOpExpr|DataSourceTemplate|DataToken|DateRangeStrings|DateString|DefaultStylesClassNamePropType|DefaultStylesPropType|EventHandler|Expr|ExprText|FigmaComponentMapping|FunctionArg|FunctionExpr|FunctionType|GenericEventHandler|GlobalVariantGroup|GlobalVariantGroupParam|GlobalVariantSplitContent|HostLessPackageInfo|HrefType|ImageAsset|ImageAssetRef|Img|Interaction|KeyFrame|LabeledSelector|MapExpr|Marker|Mixin|MultiChoice|NameArg|NamedState|NodeMarker|Num|ObjectPath|PageArena|PageHref|PageMeta|Param|PlumeInfo|PlumeInstance|PrimitiveType|ProjectDependency|PropParam|QueryData|QueryInvalidationExpr|QueryRef|RandomSplitSlice|RawText|RenderExpr|RenderFuncType|RenderableType|Rep|RichText|Rule|RuleSet|Scalar|SegmentSplitSlice|SelectorRuleSet|Site|SlotParam|Split|SplitContent|SplitSlice|State|StateChangeHandlerParam|StateParam|StrongFunctionArg|StyleExpr|StyleMarker|StyleNode|StylePropType|StyleScopeClassNamePropType|StyleToken|StyleTokenOverride|StyleTokenRef|TargetType|TemplatedString|Text|Theme|ThemeLayoutSettings|ThemeStyle|Token|TplComponent|TplNode|TplRef|TplSlot|TplTag|Var|VarRef|Variant|VariantGroup|VariantGroupState|VariantSetting|VariantedRuleSet|VariantedValue|VariantsRef|VirtualRenderExpr`;
 
 const clientFiles = [
   "platform/wab/src/wab/main.tsx",
@@ -21,6 +21,88 @@ const testFiles = [
   "**/__mocks__/**/*",
 ];
 
+const fs = require("fs");
+const path = require("path");
+
+// Find all files in the repo with overlay, e.g. `foo.external.ts` -> `foo.ts`.
+// There are two stub types (see copy.bara.sky):
+//   - `.external.` : replaces files in both public and enterprise sync
+//   - `.public.`   : replaces files only in public sync
+function findOverlayTargets(root) {
+  const targets = [];
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (
+        entry.name.includes(".external.") ||
+        entry.name.includes(".public.")
+      ) {
+        targets.push(
+          path
+            .relative(__dirname, full)
+            .replace(".external", "")
+            .replace(".public", "")
+        );
+      }
+    }
+  };
+  walk(root);
+  return targets;
+}
+
+const internalFiles = ["**/enterprise/**", "**/internal/**", "**/*.internal*"];
+const overlayTargets = findOverlayTargets(
+  path.join(__dirname, "platform/wab/src")
+);
+
+// Public synced files can't import enterprise/internal code.
+const noEnterpriseImportPattern = {
+  group: internalFiles,
+  message:
+    "Either move this file under `enterprise/`/`internal/`, or add an `.external`/`.public`" +
+    "stub sibling to override it (see copy.bara.sky).",
+};
+
+// Shared by the top-level rule and the public-import guard override (which replaces it per-file).
+const restrictedImportPaths = [
+  {
+    name: "@plasmicapp/host",
+    importNames: ["registerComponent", "CodeComponentMeta"],
+    message: "Please import from @plasmicapp/host/registerComponent instead",
+  },
+  {
+    name: "antd",
+    importNames: ["Modal"],
+    message:
+      "Please use drop-in replacement src/wab/client/components/widgets/Modal.tsx instead",
+  },
+  {
+    name: "react-use",
+    importNames: ["useAsync", "useAsyncRetry", "useAsyncFn"],
+    message: "Please use useAsyncStrict()/useAsyncFnStrict() instead",
+  },
+  {
+    name: "react-use/lib/useAsync",
+    message: "Please use useAsyncStrict() instead",
+  },
+  {
+    name: "react-use/lib/useAsyncRetry",
+    message: "Please use useAsyncStrict() instead",
+  },
+  {
+    name: "react-use/lib/useAsyncFn",
+    message: "Please use useAsyncFnStrict() instead",
+  },
+];
+
 module.exports = {
   root: true,
   ignorePatterns: [
@@ -29,6 +111,8 @@ module.exports = {
     "node_modules",
     "storybook-static",
 
+    // Examples lint themselves via their own `next lint`; also skipped in
+    // .lintstagedrc.js since eslint resolves `extends` before ignores.
     "examples/",
     "internal/",
     "packages/host/src/type-utils.ts",
@@ -96,38 +180,7 @@ module.exports = {
           "Please use reactPrompt() instead; window.prompt() does not work well with app hosting",
       },
     ],
-    "no-restricted-imports": [
-      "error",
-      {
-        name: "@plasmicapp/host",
-        importNames: ["registerComponent", "CodeComponentMeta"],
-        message:
-          "Please import from @plasmicapp/host/registerComponent instead",
-      },
-      {
-        name: "antd",
-        importNames: ["Modal"],
-        message:
-          "Please use drop-in replacement src/wab/client/components/widgets/Modal.tsx instead",
-      },
-      {
-        name: "react-use",
-        importNames: ["useAsync", "useAsyncRetry", "useAsyncFn"],
-        message: "Please use useAsyncStrict()/useAsyncFnStrict() instead",
-      },
-      {
-        name: "react-use/lib/useAsync",
-        message: "Please use useAsyncStrict() instead",
-      },
-      {
-        name: "react-use/lib/useAsyncRetry",
-        message: "Please use useAsyncStrict() instead",
-      },
-      {
-        name: "react-use/lib/useAsyncFn",
-        message: "Please use useAsyncFnStrict() instead",
-      },
-    ],
+    "no-restricted-imports": ["error", { paths: restrictedImportPaths }],
     "no-restricted-syntax": [
       "warn",
       {
@@ -202,14 +255,11 @@ module.exports = {
         types: "always",
       },
     ],
-    "jest/no-conditional-expect": "off",
   },
   env: {
     es6: true,
     node: true,
     browser: true,
-    jasmine: true,
-    jest: true,
   },
   parser: "@typescript-eslint/parser",
   overrides: [
@@ -356,6 +406,21 @@ module.exports = {
             ],
           },
         },
+        {
+          files: ["platform/wab/src/**/*.ts", "platform/wab/src/**/*.tsx"],
+          // Files allowed to import from internalFiles. Includes files which are overlay targets,
+          // since they are replaced in the public sync.
+          excludedFiles: [...testFiles, ...internalFiles, ...overlayTargets],
+          rules: {
+            "no-restricted-imports": [
+              "error",
+              {
+                paths: restrictedImportPaths,
+                patterns: [noEnterpriseImportPattern],
+              },
+            ],
+          },
+        },
       ],
 
       parserOptions: {
@@ -398,7 +463,6 @@ module.exports = {
   plugins: [
     "@typescript-eslint",
     "react",
-    "jest",
     "import",
     "eslint-plugin-no-relative-import-paths",
   ],
@@ -423,5 +487,15 @@ module.exports = {
     JSX: false,
     JQuery: false,
     cy: false,
+    // Provided by vitest's `globals: true`.
+    afterAll: "readonly",
+    afterEach: "readonly",
+    beforeAll: "readonly",
+    beforeEach: "readonly",
+    describe: "readonly",
+    expect: "readonly",
+    it: "readonly",
+    test: "readonly",
+    vi: "readonly",
   },
 };

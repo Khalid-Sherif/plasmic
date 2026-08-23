@@ -9,7 +9,7 @@ import * as React from "react";
 import { ClientDynamicPage } from "../../../app/dynamic/[slug]/page-client"; // plasmic-import: AO44A-w7hh/rscClient
 
 const $$ = {};
-import { unstable_executePlasmicQueries } from "@plasmicapp/react-web/lib/data-sources";
+import { executePlasmicQueries } from "@plasmicapp/react-web/lib/data-sources";
 import { PlasmicQueryDataProvider } from "@plasmicapp/react-web/lib/query";
 
 export function generateDynamicMetadata($q, $ctx) {
@@ -25,7 +25,7 @@ export const serverQueryTree = {
   type: "component",
   queries: {
     sha256: {
-      id: "custom:krgWtF9Kkesx",
+      id: "custom-code:krgWtF9Kkesx",
       fn: async ({ $q, $props, $ctx, $state }) => {
         console.log("Running SHA-256");
         const data = new TextEncoder().encode($ctx.params.slug);
@@ -145,7 +145,7 @@ export async function makeAppRouterPageCtx({ params, searchParams }) {
 export async function PlasmicDynamicPageServer(props) {
   const { params, searchParams, ...rest } = props;
   const ctx = await makeAppRouterPageCtx({ params, searchParams });
-  const { cache: prefetchedCache } = await unstable_executePlasmicQueries(
+  const { cache: prefetchedCache } = await executePlasmicQueries(
     serverQueryTree,
     { $props: rest, $ctx: ctx }
   );

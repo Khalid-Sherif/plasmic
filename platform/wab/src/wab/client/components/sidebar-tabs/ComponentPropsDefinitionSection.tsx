@@ -13,6 +13,10 @@ import { LabeledListItem } from "@/wab/client/components/widgets/LabeledListItem
 import { SimpleReorderableList } from "@/wab/client/components/widgets/SimpleReorderableList";
 import PlusIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Plus";
 import { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import {
+  mkModelUiId,
+  parseUiId,
+} from "@/wab/client/studio-ctx/ui/studio-ui-ids";
 import { ViewCtx } from "@/wab/client/studio-ctx/view-ctx";
 import {
   COMPONENT_PROP_LOWER,
@@ -48,6 +52,7 @@ import {
 import { Component, Param, isKnownPropParam } from "@/wab/shared/model/classes";
 import { Menu, Tooltip } from "antd";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 import { DraggableProvidedDragHandleProps } from "react-beautiful-dnd";
 import { FaCheck } from "react-icons/fa";
@@ -86,6 +91,23 @@ export const ComponentPropsDefinitionSection = observer(
       );
       setExpandedFolders((prev) => new Set([...prev, ...ancestors]));
     };
+
+    // Props may be inside collapsed folders, so listen for UI actions
+    // and expand the target param's ancestor folders so its row mounts.
+    React.useEffect(() => {
+      const { dispose } = studioCtx.uiActionBus.registerListener(
+        (uiId, _type) => {
+          const parsed = parseUiId(uiId);
+          if (parsed.type === "Model") {
+            const param = component.params.find((p) => p.uuid === parsed.uuid);
+            if (param) {
+              expandAncestorsOf(param);
+            }
+          }
+        }
+      );
+      return dispose;
+    }, [studioCtx, component]);
 
     const slotParams = getSlotParams(component);
     const realParams = getRealParams(component);
@@ -190,9 +212,9 @@ const PropsLevel = observer(function PropsLevel(props: {
   return (
     <SimpleReorderableList
       onReordered={(fromIndex, toIndex) =>
-        studioCtx.change(({ success }) => {
+        studioCtx.change(() => {
           reorderLevel(component, siblings, fromIndex, toIndex);
-          return success();
+          return ok();
         })
       }
       customDragHandle
@@ -313,6 +335,7 @@ const PropRow = observer(function ParamRow(props: {
     <>
       <WithContextMenu overlay={overlay}>
         <LabeledListItem
+          uiId={mkModelUiId(param)}
           draggable={draggable}
           dragHandleProps={props.dragHandleProps}
           onClick={() => setShowModal(true)}
@@ -324,7 +347,7 @@ const PropRow = observer(function ParamRow(props: {
                 )}
                 onEdit={(val) =>
                   spawn(
-                    studioCtx.change(({ success }) => {
+                    studioCtx.change(() => {
                       if (val) {
                         const newName = renameFolderLeaf(
                           getParamDisplayName(component, param),
@@ -335,7 +358,7 @@ const PropRow = observer(function ParamRow(props: {
                           .renameParam(component, param, newName);
                         expandAncestorsOf(param);
                       }
-                      return success();
+                      return ok();
                     })
                   )
                 }

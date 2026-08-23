@@ -25,18 +25,25 @@ import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill';
 const commitHash = execSync("git rev-parse HEAD").toString().slice(0, 6);
 const buildEnv = process.env.NODE_ENV ?? "production";
 const isProd = buildEnv === "production";
+// Interface to listen on, shared with the other servers in the dev stack.
+const bindHost: string = process.env.BIND_HOST ?? "0.0.0.0";
 const port: number = process.env.PORT ? +process.env.PORT : 3003;
 const backendPort: number = process.env.BACKEND_PORT
   ? +process.env.BACKEND_PORT
   : 3004;
+// Where to reach the backend, which is not necessarily where it binds.
+const backendHost: string = process.env.BACKEND_HOST ?? "localhost";
 const publicUrl: string =
   process.env.PUBLIC_URL ?? (isProd ? homepage : `http://localhost:${port}`);
+const staticUrl: string = process.env.STATIC_URL ?? publicUrl;
 
 console.log(`Starting rsbuild...
 - commitHash: ${commitHash}
 - buildEnv: ${buildEnv}
 - publicUrl: ${publicUrl}
+- bindHost: ${bindHost}
 - port: ${port}
+- backendHost: ${backendHost}
 - backendPort: ${backendPort}
 `);
 
@@ -93,10 +100,10 @@ class AppendSourceMapWithHash implements RspackPluginInstance {
       );
     });
 
-    // This hook appends the source map reference when doing `yarn build`. Not
+    // This hook appends the source map reference when doing `pnpm build`. Not
     // sure why this is necessary and why the previous hook alone isn't enough;
     // with just the previous hook, the source map reference is stripped out
-    // completely for `yarn build`.
+    // completely for `pnpm build`.
     compiler.hooks.emit.tapAsync(
       "AppendSourceMapWithHash",
       (compilation, callback) => {
@@ -134,10 +141,11 @@ export default defineConfig({
     liveReload: false,
   },
   server: {
+    host: bindHost,
     port,
     proxy: {
       "/api": {
-        target: `http://localhost:${backendPort}`,
+        target: `http://${backendHost}:${backendPort}`,
         ws: true,
       },
     },
@@ -147,19 +155,27 @@ export default defineConfig({
       index: "src/wab/client/main.tsx",
     },
   },
-  resolve:
-    buildEnv === "production"
-      ? {}
-      : {
-          alias: {
+  resolve: {
+    alias: {
+      // Force a single jquery instance in the bundle. jquery plugins
+      // (jquery-serializejson) import "jquery" themselves, and under pnpm's
+      // isolated node_modules they can resolve a different copy than the app
+      // (the workspace has both 3.5.1 and 3.7.1), so the plugin registers
+      // itself on an instance the app never sees.
+      jquery: "./node_modules/jquery",
+      ...(buildEnv === "production"
+        ? {}
+        : {
             // In case you are linking to locally built packages,
             // sometimes you end up with duplicate React versions.
             // This fixes that issue.
             react: "./node_modules/react",
             "react-dom": "./node_modules/react-dom",
-          },
-        },
+          }),
+    },
+  },
   output: {
+    assetPrefix: staticUrl,
     distPath: {
       root: "build",
     },
@@ -247,8 +263,7 @@ export default defineConfig({
           mkDefinePluginOptsForEnv({
             NODE_ENV: REQUIRED_VAR,
             COMMITHASH: commitHash,
-            PUBLICPATH: publicUrl,
-            INTERCOM_APP_ID: OPTIONAL_VAR,
+            STATIC_URL: OPTIONAL_VAR,
             POSTHOG_API_KEY: OPTIONAL_VAR,
             POSTHOG_HOST: OPTIONAL_VAR,
             POSTHOG_REVERSE_PROXY_HOST: OPTIONAL_VAR,
@@ -265,6 +280,9 @@ export default defineConfig({
             {
               inject: true,
               template: "./public/index.html",
+              templateParameters: {
+                staticUrl,
+              },
             },
             buildEnv === "production"
               ? {

@@ -16,6 +16,7 @@ import { ComponentDataQuery } from "@/wab/shared/model/classes";
 import { Popover, Tooltip } from "antd";
 import { default as classNames } from "classnames";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 
 interface DataPickerEditorProps {
@@ -24,7 +25,6 @@ interface DataPickerEditorProps {
   viewCtx?: ViewCtx;
   data?: Record<string, any>;
   schema?: DataPickerTypesSchema;
-  flatten?: boolean;
   onUnlink?: () => void;
   isDisabled?: boolean;
   disabledTooltip?: React.ReactNode | (() => React.ReactNode);
@@ -57,7 +57,6 @@ export const InternalDataPickerEditor = observer(
       viewCtx,
       data,
       schema,
-      flatten,
       onUnlink,
       isDisabled,
       disabledTooltip,
@@ -129,7 +128,6 @@ export const InternalDataPickerEditor = observer(
             onCancel={() => setVisible(false)}
             data={data}
             schema={schema}
-            flatten={flatten}
             hideStateSwitch={hideStateSwitch}
             onUnlink={
               onUnlink
@@ -146,7 +144,7 @@ export const InternalDataPickerEditor = observer(
             onAddQuery={() => {
               if (viewCtx) {
                 spawn(
-                  viewCtx.studioCtx.change(({ success }) => {
+                  viewCtx.studioCtx.change(() => {
                     const component = viewCtx.currentTplComponent().component;
                     const newQuery = new ComponentDataQuery({
                       uuid: mkShortId(),
@@ -165,7 +163,7 @@ export const InternalDataPickerEditor = observer(
                     viewCtx.studioCtx.switchRightTab(RightTabKey.component);
                     viewCtx.studioCtx.newlyAddedQuery = newQuery;
                     setVisible(false);
-                    return success();
+                    return ok();
                   })
                 );
               }

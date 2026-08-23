@@ -1,6 +1,13 @@
 {
   "name": "@plasmicapp/prepass",
-  "version": "1.0.24",
+  "version": "1.0.28",
+  "description": "Server-side prepass that fake-renders a React tree to prefetch all @plasmicapp/query data requirements.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "packages/prepass"
+  },
   "types": "./dist/index.d.ts",
   "main": "./dist/index.cjs.js",
   "module": "./dist/index.esm.js",
@@ -11,11 +18,11 @@
     "node": ">=12"
   },
   "scripts": {
-    "build": "yarn build:types && yarn build:index",
-    "build:types": "yarn tsc --emitDeclarationOnly",
+    "build": "pnpm build:types && pnpm build:index",
+    "build:types": "tsc --emitDeclarationOnly",
     "build:index": "esbuild --format=cjs --outfile=./dist/index.cjs.js ./src/index.tsx && esbuild --format=esm --outfile=./dist/index.esm.js ./src/index.tsx",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test",
-    "coverage": "TEST_CWD=`pwd` yarn --cwd=../.. test --coverage --passWithNoTests",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
+    "coverage": "TEST_CWD=`pwd` pnpm -w test --coverage --passWithNoTests",
     "lint": "eslint",
     "prepublishOnly": "npm run build"
   },
@@ -23,7 +30,7 @@
     "@types/react": "^18"
   },
   "dependencies": {
-    "@plasmicapp/query": "0.1.84",
+    "@plasmicapp/query": "0.1.87",
     "@plasmicapp/react-ssr-prepass": "^2.0.9"
   },
   "peerDependencies": {

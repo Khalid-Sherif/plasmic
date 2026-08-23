@@ -3,19 +3,16 @@ import { showTemporaryInfo } from "@/wab/client/components/quick-modals";
 import { AnonymousAvatar, Avatar } from "@/wab/client/components/studio/Avatar";
 import { FigmaModalContent } from "@/wab/client/components/studio/FigmaModalContent";
 import LeftTabButton from "@/wab/client/components/studio/LeftTabButton";
-import { isIntercomEnabled } from "@/wab/client/intercom";
+import { DataTokenIcon } from "@/wab/client/icons";
 import GearIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Gear";
 import MixinIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Mixin";
 import SlackIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Slack";
 import TreeIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Tree";
-import WandIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Wand";
 import KeyboardIcon from "@/wab/client/plasmic/plasmic_kit_design_system/PlasmicIcon__Keyboard";
 import BooksvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__BookSvg";
-import ChatDocssvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ChatDocsSvg";
 import ClocksvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ClockSvg";
 import ComponentsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ComponentSvg";
 import ComponentssvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ComponentsSvg";
-import CurlyBracesIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__CurlyBraces";
 import DevicessvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__DevicesSvg";
 import DotsHorizontalCirclesvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__DotsHorizontalCircleSvg";
 import DownloadsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__DownloadSvg";
@@ -28,12 +25,12 @@ import MessagesvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/Plasmic
 import Paintbrush2SvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__Paintbrush2Svg";
 import PhotosvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__PhotoSvg";
 import SearchSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__SearchSvg";
+import SplitSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__SplitSvg";
 import WarningTrianglesvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__WarningTriangleSvg";
 import {
   DefaultLeftTabStripProps,
   PlasmicLeftTabStrip,
 } from "@/wab/client/plasmic/plasmic_kit_left_pane/PlasmicLeftTabStrip";
-import IconIcon from "@/wab/client/plasmic/plasmic_kit_left_pane/icons/PlasmicIcon__Icon";
 import DiamondsIcon from "@/wab/client/plasmic/plasmic_kit_merge_flow/icons/PlasmicIcon__Diamonds";
 import { StudioCtx, useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { PlayerData } from "@/wab/client/studio-ctx/multiplayer-ctx";
@@ -44,7 +41,6 @@ import { spawn, unexpected } from "@/wab/shared/common";
 import { DEVFLAGS } from "@/wab/shared/devflags";
 import { BASE_URL } from "@/wab/shared/discourse/config";
 import { APP_ROUTES } from "@/wab/shared/route/app-routes";
-import { fillRoute } from "@/wab/shared/route/route";
 import {
   LeftTabKey,
   LeftTabUiKey,
@@ -56,7 +52,6 @@ import { omit } from "lodash";
 import { observer } from "mobx-react";
 import * as React from "react";
 import { ReactNode } from "react";
-import { useIntercom } from "react-use-intercom";
 
 interface LeftTabStripProps extends DefaultLeftTabStripProps {
   useVersionsCTA: boolean;
@@ -83,7 +78,6 @@ export interface NavMenuGroup {
 
 const LeftTabStrip = observer(function LeftTabStrip(props: LeftTabStripProps) {
   const studioCtx = useStudioCtx();
-  const { show: showIntercom } = useIntercom();
   const isLoggedIn = studioCtx.appCtx.selfInfo != null;
   const contentEditorMode = studioCtx.contentEditorMode;
   const hasGlobalContexts = studioCtx.site.globalContexts.length > 0;
@@ -103,8 +97,6 @@ const LeftTabStrip = observer(function LeftTabStrip(props: LeftTabStripProps) {
 
   /*
   Outline
-
-Copilot
 
 Issues
 
@@ -147,7 +139,7 @@ Help
         dataTokens: {
           type: "item",
           tabKey: "dataTokens",
-          icon: <CurlyBracesIcon />,
+          icon: <DataTokenIcon />,
           label: "Data tokens",
           cond: studioCtx.showDataTokens() && canViewTab("dataTokens"),
         },
@@ -225,7 +217,7 @@ Help
         splits: {
           type: "item",
           tabKey: "splits",
-          icon: <IconIcon />,
+          icon: <SplitSvgIcon />,
           label: "Split content",
           cond:
             isLoggedIn &&
@@ -280,13 +272,6 @@ Help
       icon: <TreeIcon />,
       label: "Outline",
     },
-    copilot: {
-      type: "item",
-      tabKey: "copilot",
-      icon: <WandIcon />,
-      label: "Copilot",
-      cond: studioCtx.appCtx.appConfig.copilotTab && canViewTab("copilot"),
-    },
     lint: {
       type: "item",
       tabKey: "lint",
@@ -308,13 +293,6 @@ Help
       : mainGroups),
   };
   const bottomMenu: Record<string, NavMenuItem | NavMenuGroup> = {
-    intercom: {
-      type: "item",
-      icon: <ChatDocssvgIcon />,
-      label: "Chat Docs",
-      cond: isIntercomEnabled(studioCtx),
-      onClick: showIntercom,
-    },
     helpGroup: {
       type: "group",
       icon: <HelpCirclesvgIcon />,
@@ -353,7 +331,7 @@ Help
           icon: <HelpsvgIcon />,
           label: "Help",
           href: studioCtx.siteInfo.teamId
-            ? fillRoute(APP_ROUTES.orgSupport, {
+            ? APP_ROUTES.orgSupport.fill({
                 teamId: studioCtx.siteInfo.teamId!,
               })
             : undefined,

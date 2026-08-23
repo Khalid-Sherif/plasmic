@@ -1,14 +1,18 @@
+import sty from "@/wab/client/components/sidebar-tabs/DataBinding/DataPickerColumn.module.scss";
 import DataPickerColumnItem from "@/wab/client/components/sidebar-tabs/DataBinding/DataPickerColumnItem";
 import {
   ColumnItem,
   DataPickerOpts,
   evalExpr,
+  getDollarVarIcon,
   getItemPath,
+  getSourceUiId,
   getSupportedObjectKeys,
   getVariableType,
   isListType,
   isTypeSupported,
 } from "@/wab/client/components/sidebar-tabs/DataBinding/DataPickerUtil";
+import { useViewCtxMaybe } from "@/wab/client/contexts/StudioContexts";
 import {
   DefaultDataPickerColumnProps,
   PlasmicDataPickerColumn,
@@ -20,13 +24,14 @@ import {
 } from "@/wab/client/state-management/preview-steps";
 import { useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { ensure, isTruthy } from "@/wab/shared/common";
+import { isTplTagOrComponent } from "@/wab/shared/core/tpls";
 import { DEVFLAGS } from "@/wab/shared/devflags";
 import { pathToString } from "@/wab/shared/eval/expression-parser";
 import { ensureKnownInteraction } from "@/wab/shared/model/classes";
-import { isTplTagOrComponent } from "@/wab/shared/core/tpls";
 import { mkMetaName } from "@plasmicapp/host";
 import { HTMLElementRefOf } from "@plasmicapp/react-web";
 import { notification } from "antd";
+import { observer } from "mobx-react";
 import * as React from "react";
 
 export interface DataPickerColumnProps extends DefaultDataPickerColumnProps {
@@ -37,6 +42,23 @@ export interface DataPickerColumnProps extends DefaultDataPickerColumnProps {
   columnItems: ColumnItem[];
   onItemSelected: (column: number, item: number) => void;
   opts: DataPickerOpts;
+  onCancelDataPicker?: () => void;
+  // Error message shown in place of data fields when set.
+  errorMessage?: string;
+}
+
+/** The contents of a column standing in for data that failed to resolve. */
+function ColumnErrorNotice(props: { columnIndex: number; message: string }) {
+  const { columnIndex, message } = props;
+  return (
+    <div
+      className={sty.columnError}
+      data-test-id={`data-picker-column-${columnIndex}-error`}
+    >
+      <div className={sty.columnErrorTitle}>Error</div>
+      <div className={sty.columnErrorMessage}>{message}</div>
+    </div>
+  );
 }
 
 function DataPickerColumn_(
@@ -51,6 +73,8 @@ function DataPickerColumn_(
     onItemSelected,
     isActiveColumn,
     opts,
+    onCancelDataPicker,
+    errorMessage,
     ...rest
   } = props;
   if (!data) {
@@ -58,6 +82,7 @@ function DataPickerColumn_(
   }
 
   const studioCtx = useStudioCtx();
+  const viewCtx = useViewCtxMaybe();
   const getInteraction = React.useCallback(
     (key: string) => {
       return data["$steps"]?.[mkMetaName(key)]?.interaction;
@@ -82,60 +107,84 @@ function DataPickerColumn_(
       root={{ ref, id: `data-picker-column-${columnIndex}` }}
       {...rest}
       previewSteps={enabledPreviewSteps && isStepsColumn}
-      children={columnItems
-        .map(({ name: key, label, pathPrefix, value }, index) => {
-          const itemPath = getItemPath(pathPrefix, key);
-          const variableType = getVariableType(value);
-          if (!isTypeSupported(variableType)) {
-            return undefined;
-          }
-          const keyCount = isListType(variableType)
-            ? getSupportedObjectKeys(value, opts).length
-            : 0;
-          const previewValue = !isListType(variableType)
-            ? evalExpr(
-                itemPath,
-                ensure(data, "Should only be called if data exists")
-              )
-            : variableType === "array"
-            ? keyCount + ` item${keyCount === 1 ? "" : "s"}`
-            : undefined;
-          const isSelected = index === selectedItem;
-          return (
-            <DataPickerColumnItem
-              ref={
-                isSelected && isActiveColumn
-                  ? (el) =>
-                      setTimeout(
-                        () =>
-                          el?.scrollIntoView({
-                            block: "center",
-                            inline: "start",
-                            behavior: "smooth",
-                          }),
-                        0
-                      )
-                  : undefined
+      children={
+        errorMessage != null ? (
+          <ColumnErrorNotice columnIndex={columnIndex} message={errorMessage} />
+        ) : (
+          columnItems
+            .map((item, index) => {
+              const { name: key, label, value } = item;
+              const path = getItemPath(item);
+              const variableType = getVariableType(value);
+              if (!isTypeSupported(variableType)) {
+                return undefined;
               }
-              key={pathToString(itemPath)}
-              itemName={label ?? key}
-              variableType={variableType}
-              previewValue={previewValue}
-              isSelected={isSelected}
-              onClick={() => onItemSelected(columnIndex, index)}
-              columnIndex={columnIndex}
-              step={
-                isStepsColumn && enabledPreviewSteps
-                  ? wasStepExecuted(key)
-                    ? "played"
-                    : "notPlayed"
-                  : undefined
-              }
-              interaction={getInteraction(key)}
-            />
-          );
-        })
-        .filter(isTruthy)}
+              const keyCount = isListType(variableType)
+                ? getSupportedObjectKeys(value, opts).length
+                : 0;
+              // Indicator for a row whose data errored.
+              const errorPreview =
+                item.errorMessage != null ? "error" : undefined;
+              const previewValue =
+                errorPreview ??
+                (!isListType(variableType)
+                  ? evalExpr(
+                      path,
+                      ensure(data, "Should only be called if data exists")
+                    )
+                  : variableType === "array"
+                  ? keyCount + ` item${keyCount === 1 ? "" : "s"}`
+                  : undefined);
+              const isSelected = index === selectedItem;
+              const sourceUiId = viewCtx
+                ? getSourceUiId(path, viewCtx.site, viewCtx.currentComponent())
+                : undefined;
+              return (
+                <DataPickerColumnItem
+                  ref={
+                    isSelected && isActiveColumn
+                      ? (el) =>
+                          setTimeout(
+                            () =>
+                              el?.scrollIntoView({
+                                block: "center",
+                                inline: "start",
+                                behavior: "smooth",
+                              }),
+                            0
+                          )
+                      : undefined
+                  }
+                  key={pathToString(path)}
+                  itemName={label ?? key}
+                  variableType={variableType}
+                  icon={columnIndex === 0 ? getDollarVarIcon(path) : undefined}
+                  previewValue={previewValue}
+                  isSelected={isSelected}
+                  onClick={() => onItemSelected(columnIndex, index)}
+                  onJumpToSource={
+                    sourceUiId
+                      ? () => {
+                          onCancelDataPicker?.();
+                          studioCtx.uiActionBus.dispatch(sourceUiId, "jump");
+                        }
+                      : undefined
+                  }
+                  columnIndex={columnIndex}
+                  step={
+                    isStepsColumn && enabledPreviewSteps
+                      ? wasStepExecuted(key)
+                        ? "played"
+                        : "notPlayed"
+                      : undefined
+                  }
+                  interaction={getInteraction(key)}
+                />
+              );
+            })
+            .filter(isTruthy)
+        )
+      }
       runAllSteps={{
         onClick: () => {
           const currentInteraction = ensureKnownInteraction(
@@ -167,5 +216,5 @@ function DataPickerColumn_(
   );
 }
 
-const DataPickerColumn = React.forwardRef(DataPickerColumn_);
+const DataPickerColumn = observer(React.forwardRef(DataPickerColumn_));
 export default DataPickerColumn;

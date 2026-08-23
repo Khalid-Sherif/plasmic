@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/plasmic-yotpo",
-  "version": "0.0.90",
+  "version": "0.0.103",
   "description": "Plasmic Yotpo components.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/plasmic-yotpo"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "module": "dist/plasmic-yotpo.esm.js",
@@ -14,7 +21,7 @@
   "scripts": {
     "start": "tsdx watch",
     "build": "tsdx build",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test --passWithNoTests",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
     "lint": "tsdx lint",
     "prepublishOnly": "npm run build",
     "size": "size-limit",
@@ -34,9 +41,9 @@
     }
   ],
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "@plasmicapp/query": "0.1.84",
-    "@types/dlv": "^1.1.2",
+    "@plasmicapp/host": "2.0.17",
+    "@plasmicapp/query": "0.1.87",
+    "@types/dlv": "^1.1.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "husky": "^7.0.4",
@@ -46,7 +53,7 @@
     "tslib": "^2.3.1"
   },
   "dependencies": {
-    "@types/lodash": "^4.14.197",
+    "@types/lodash": "^4.17.24",
     "change-case": "^4.1.2",
     "dlv": "^1.1.3",
     "lodash": "^4.17.21"

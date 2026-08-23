@@ -22,7 +22,7 @@ This repo contains:
 
 For hacking on code components or `plasmicpkgs`, see specific additional instructions further down.
 
-We use `lerna` to help us manage dependencies among all the packages.
+`packages/` and `plasmicpkgs/` are a `pnpm` workspace (see `pnpm-workspace.yaml`), `lerna` is used for versioning and publishing.
 
 In general, we follow the "fork-and-pull" Git workflow.
 
@@ -51,7 +51,7 @@ To configure the platform locally follow the instructions in [getting started gu
 Internally we use [Verdaccio](https://verdaccio.org/) to locally test packages. This just stands up a local npm registry that you can publish your test packages to.
 
 ```
-yarn global add verdaccio
+pnpm add -g verdaccio
 verdaccio &  # Runs the verdaccio server at http://localhost:4873
 ```
 
@@ -111,7 +111,7 @@ cd packages/cli/
 
 # Step 1. (One-time)
 # Ensure dependencies are built.
-npx nx build @plasmicapp/cli
+pnpm --filter "@plasmicapp/cli..." run build
 
 # Step 2. (Repeat)
 # Hackety hack, then you can directly run the source with esbuild-register.
@@ -130,12 +130,12 @@ If you need the package installed in another npm project to test it, like say a 
 # This unpublishes YOURPKG and its dependencies from your verdaccio, re-builds them, and publishes them to your local
 # verdaccio.
 # Note that this does not bump versions!
-# We are using nx under the hood, so if your dependencies haven't changed, this should be fast.
+# pnpm builds the dependency graph, so if your dependencies haven't changed, this should be fast.
 # In this example, even though we edited @plasmicapp/host, we can just think about publishing the "root" package(s) we're ultimately installing into the test app, in this case @plasmicapp/loader-nextjs.
-yarn local-publish @plasmicapp/loader-nextjs &&
+pnpm local-publish @plasmicapp/loader-nextjs &&
 
 # Or publish all packages to verdaccio. This will take longer.
-# yarn local-publish
+# pnpm local-publish
 
 # Step 3.
 # Go to the package you're testing, e.g. test-host-app.
@@ -168,32 +168,19 @@ Check that the versions in your package.json are also not holding back any plasm
 In general, you probably want all @plasmicapp/@plasmicpkgs packages to be installed from your local verdaccio, rather than having some installed from npmjs.org and others installed from local,
 since you want to prevent mismatched and duplicate package versions.
 
-### Odds and ends
-
-For a few packages like react-ssr-prepass, these are not currently integrated into the NX workspace system.
-This is because Lerna doesn't work with git submodules.
-You can publish these as individual packages with, for instance:
-
-```
-cd plasmicpkgs/SOMETHING
-yarn install # Not included in the workspace install
-yarn publish --registry=http://localhost:4873
-# Or with more options: yarn publish --canary --yes --include-merged-tags --no-git-tag-version --no-push --registry=http://localhost:4873 --force-publish
-```
-
 ## Contributing code components (`plasmicpkgs`)
 
 The above general contribution instructions also apply to plasmicpkgs, so read that if you haven't done so.
 
 Before starting, we recommend reading our docs for Code Components:
 
-- [Docs on code components][https://docs.plasmic.app/learn/code-components/]
+- [Docs on code components](https://docs.plasmic.app/learn/code-components/)
 
 ### Creating a new package
 
 Ignore this if you are just updating an existing package.
 
-To create a new plasmicpkg, the easiest approach is to clone one of the existing packages (like react-slick) and fix up the names in package.json and README. Then author your registration code in src. Please use `yarn` for package management.
+To create a new plasmicpkg, the easiest approach is to clone one of the existing packages (like `plasmicpkgs/fetch`, which has an up-to-date build setup, see [plasmicpkgs/README.md](plasmicpkgs/README.md)), then fix names in package.json and README. Then author your registration code in src. Use `pnpm` for package management.
 
 The directory name should be the same name as the main package you'll be using to import the React components. Your package must be named `@plasmicpkgs/{package-name}` and start with version 1.0.0.
 
@@ -211,17 +198,13 @@ So a typical `package.json` might look like this:
 ```json
 {
   "devDependencies": {
-    "@plasmicapp/data-sources": "0.1.53",
-    "@plasmicapp/host": "1.0.119",
-    "@size-limit/preset-small-lib": "^4.11.0",
-    "@types/node": "^14.0.26",
-    "size-limit": "^4.11.0",
-    "tsdx": "^0.14.1",
+    "@plasmicapp/data-sources": "1.0.21",
+    "@plasmicapp/host": "2.0.12",
     "tslib": "^2.2.0",
-    "typescript": "^3.9.7"
+    "typescript": "^5.7.3"
   },
   "peerDependencies": {
-    "@plasmicapp/data-sources": ">=0.1.52",
+    "@plasmicapp/data-sources": ">=1.0.0",
     "@plasmicapp/host": ">=1.0.0",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"

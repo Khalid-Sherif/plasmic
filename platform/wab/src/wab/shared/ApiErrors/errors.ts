@@ -84,8 +84,8 @@ export class CopilotRateLimitExceededError extends ApiError {
 export class PublicCopilotServiceUnavailable extends ApiError {
   name = "PublicCopilotServiceUnavailable";
   statusCode = 503;
-  constructor(options?: ErrorOptions) {
-    super("Service unavailable", options);
+  constructor() {
+    super("Service unavailable");
   }
 }
 

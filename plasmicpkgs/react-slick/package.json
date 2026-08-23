@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/react-slick",
-  "version": "0.0.268",
+  "version": "0.0.281",
   "description": "Plasmic registration call for the React Slick Slider component",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/react-slick"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/react-slick.esm.js",
@@ -21,15 +28,15 @@
   "scripts": {
     "build": "tsdx build",
     "start": "tsdx watch",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test --passWithNoTests",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
     "lint": "tsdx lint",
     "prepublishOnly": "npm run build",
     "size": "size-limit",
     "analyze": "size-limit --why"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "@types/node": "^14.0.26",
+    "@plasmicapp/host": "2.0.17",
+    "@types/node": "^14.18.63",
     "@types/react": "^18",
     "@types/react-slick": "^0.23.7",
     "tsdx": "^0.14.1",

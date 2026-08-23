@@ -4,7 +4,7 @@ import {
   getBaseVariant,
 } from "@/wab/shared/Variants";
 import { serializeArgsType } from "@/wab/shared/codegen/react-p/params";
-import { pageReferencesSearchParams } from "@/wab/shared/codegen/react-p/serialize-utils";
+import { getPageSearchParamsUsage } from "@/wab/shared/codegen/react-p/serialize-utils";
 import {
   getDataTokensFromServerQueries,
   serializeRootServerQueryTree,
@@ -27,7 +27,11 @@ import {
   mkComponent,
   mkPageMeta,
 } from "@/wab/shared/core/components";
-import { codeLit, customCode } from "@/wab/shared/core/exprs";
+import {
+  codeLit,
+  customCode,
+  mkTemplatedStringOfOneDynExpr,
+} from "@/wab/shared/core/exprs";
 import { mkParam, mkParamsForState } from "@/wab/shared/core/lang";
 import { mkState } from "@/wab/shared/core/states";
 import { mkTplInlinedText, mkTplTagX } from "@/wab/shared/core/tpls";
@@ -119,26 +123,37 @@ describe("Code generation of server queries", () => {
   describe("serializeMakeAppRouterPageCtx", () => {
     function serializePageCtx(component: ReturnType<typeof mkComponent>) {
       return serializeMakeAppRouterPageCtx(
-        { component } as SerializerBaseContext,
-        "PageProps",
-        { usesSearchParams: pageReferencesSearchParams(component) }
+        { component, exportOpts: {} } as SerializerBaseContext,
+        {
+          usesSearchParams:
+            getPageSearchParamsUsage(component).outsideRenderTree,
+        }
       );
     }
 
-    it("awaits searchParams when page render expressions reference $ctx.query", () => {
+    it("keeps query static when $ctx.query is read only in render expressions", () => {
       const component = makePageWithDynamicText("$ctx.query.myquery");
 
-      expect(pageReferencesSearchParams(component)).toBe(true);
-      expect(serializePageCtx(component)).toContain(
-        "query: (await searchParams) ?? {},"
-      );
+      // Referenced, but only in the render tree, so the page can stay static.
+      expect(getPageSearchParamsUsage(component)).toEqual({
+        inRenderTree: true,
+        outsideRenderTree: false,
+      });
+      const serialized = serializePageCtx(component);
+      expect(serialized).toContain("query: {},");
+      expect(serialized).not.toContain("await searchParams");
     });
 
-    it("keeps query static when page render expressions do not reference $ctx.query", () => {
+    it("keeps query static when the page does not reference $ctx.query", () => {
       const component = makePageWithDynamicText("$ctx.params.slug");
 
-      expect(pageReferencesSearchParams(component)).toBe(false);
-      expect(serializePageCtx(component)).toContain("query: {},");
+      expect(getPageSearchParamsUsage(component)).toEqual({
+        inRenderTree: false,
+        outsideRenderTree: false,
+      });
+      const serialized = serializePageCtx(component);
+      expect(serialized).toContain("query: {},");
+      expect(serialized).not.toContain("await searchParams");
     });
 
     it("awaits searchParams when server query args reference $ctx.query", () => {
@@ -154,7 +169,58 @@ describe("Code generation of server queries", () => {
       );
       component.pageMeta = mkPageMeta({ path: "/advanced" });
 
-      expect(pageReferencesSearchParams(component)).toBe(true);
+      expect(getPageSearchParamsUsage(component)).toEqual({
+        inRenderTree: false,
+        outsideRenderTree: true,
+      });
+      expect(serializePageCtx(component)).toContain(
+        "query: (await searchParams) ?? {},"
+      );
+    });
+
+    it("awaits searchParams when page metadata references $ctx.query", () => {
+      const component = makePageWithDynamicText("$ctx.params.slug");
+      component.pageMeta = mkPageMeta({
+        path: "/advanced",
+        title: mkTemplatedStringOfOneDynExpr(customCode("$ctx.query.myquery")),
+      });
+
+      // Metadata is generated on the server, so query params must be awaited.
+      expect(getPageSearchParamsUsage(component)).toEqual({
+        inRenderTree: false,
+        outsideRenderTree: true,
+      });
+      expect(serializePageCtx(component)).toContain(
+        "query: (await searchParams) ?? {},"
+      );
+    });
+
+    it("awaits searchParams when $ctx.query is read in both render and a server query", () => {
+      const component = mkComponentWithQueries(
+        mkServerQuery(
+          "query",
+          mkCustomFunctionExpr(
+            "func",
+            ["param"],
+            [{ name: "param", code: "$ctx.query.serverside" }]
+          )
+        )
+      );
+      component.pageMeta = mkPageMeta({ path: "/advanced" });
+      const baseVariant = getBaseVariant(component);
+      const textTpl = mkTplInlinedText("", [baseVariant], "div");
+      ensureBaseVariantSetting(textTpl).text = new ExprText({
+        expr: customCode("$ctx.query.clientside"),
+        html: false,
+      });
+      $$$(component.tplTree).append(textTpl);
+
+      // The server-query usage forces the dynamic (awaited) path even though
+      // the render tree also reads a (different) query param.
+      expect(getPageSearchParamsUsage(component)).toEqual({
+        inRenderTree: true,
+        outsideRenderTree: true,
+      });
       expect(serializePageCtx(component)).toContain(
         "query: (await searchParams) ?? {},"
       );
@@ -262,7 +328,7 @@ export const PlasmicComponent__ArgProps = new Array<ArgPropType>("param1");
 
       const result = serializeRootServerQueryTree(makeCtx(component));
       expect(result).toContain("myQuery");
-      expect(result).toContain('id: "custom:' + query.uuid);
+      expect(result).toContain('id: "custom-code:' + query.uuid);
       expect(result).toContain("fn: ({ $q, $props, $ctx, $state }) => {"); // no async
       expect(result).toContain("return 1 + 2;");
       expect(result).toContain(
@@ -287,7 +353,7 @@ export const PlasmicComponent__ArgProps = new Array<ArgPropType>("param1");
 
       const result = serializeRootServerQueryTree(makeCtx(component));
       expect(result).toContain("myQuery");
-      expect(result).toContain('id: "custom:' + query.uuid);
+      expect(result).toContain('id: "custom-code:' + query.uuid);
       expect(result).toContain("fn: async ({ $q, $props, $ctx, $state }) => {"); // has async
       expect(result).toContain("return await new Promise(r => r(3000))");
       expect(result).toContain(
@@ -523,7 +589,7 @@ export const PlasmicComponent__ArgProps = new Array<ArgPropType>("param1");
   });
 
   describe("serializeServerComponentBody", () => {
-    it("passes $props and $ctx to unstable_executePlasmicQueries", () => {
+    it("passes $props and $ctx to executePlasmicQueries", () => {
       // Page component with a server query that references $state, plus a
       // private number state with a default value. stateSpecs is now carried
       // on the serverQueryTree itself, so the component body does not need to

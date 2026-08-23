@@ -9,11 +9,11 @@ import Select from "@/wab/client/components/widgets/Select";
 import TrashsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__TrashSvg";
 import { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { cachedExprsInSite } from "@/wab/shared/cached-selectors";
-import { customFunctionId } from "@/wab/shared/code-components/code-components";
 import { ensure, removeWhere } from "@/wab/shared/common";
 import { getComponentDisplayName } from "@/wab/shared/core/components";
 import { fixCustomFunctionExpr } from "@/wab/shared/core/custom-functions";
 import { isDynamicExpr } from "@/wab/shared/core/exprs";
+import { customFunctionId } from "@/wab/shared/core/query-ids";
 import { ExprReference, findExprsInInteraction } from "@/wab/shared/core/tpls";
 import { codeUsesFunction } from "@/wab/shared/eval/expression-parser";
 import {
@@ -28,6 +28,7 @@ import {
 } from "@/wab/shared/model/classes";
 import { renameDollarFunctions } from "@/wab/shared/refactoring";
 import { naturalSort } from "@/wab/shared/sort";
+import { ok } from "neverthrow";
 import * as React from "react";
 
 type RemapFunctionResponse = CustomFunction | "delete";
@@ -37,7 +38,9 @@ interface ExprRef {
   exprRefs: ExprReference[];
 }
 
-function getCustomFunctionDisplayName(customFunction: CustomFunction): string {
+export function getCustomFunctionDisplayName(
+  customFunction: CustomFunction
+): string {
   return customFunction.displayName || customFunctionId(customFunction);
 }
 
@@ -234,7 +237,7 @@ export async function updateSiteCustomFunctions(props: {
     ]);
 
   await ctx.change(
-    ({ success }) => {
+    () => {
       // Add new functions first, so they can be used for remapping
       for (const customFunction of newFunctions) {
         site.customFunctions.push(customFunction);
@@ -306,7 +309,7 @@ export async function updateSiteCustomFunctions(props: {
           }
         });
       });
-      return success();
+      return ok();
     },
     { noUndoRecord: true }
   );

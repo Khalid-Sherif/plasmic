@@ -1,8 +1,8 @@
 import { customFunctionsAndLibsUsedByComponent } from "@/wab/shared/cached-selectors";
-import { customFunctionId } from "@/wab/shared/code-components/code-components";
 import { SerializerBaseContext } from "@/wab/shared/codegen/react-p/types";
 import { CustomFunctionConfig } from "@/wab/shared/codegen/types";
 import { ensure } from "@/wab/shared/common";
+import { customFunctionId } from "@/wab/shared/core/query-ids";
 import { isHostLessPackage } from "@/wab/shared/core/sites";
 import { CodeLibrary, CustomFunction } from "@/wab/shared/model/classes";
 import { groupBy } from "lodash";
@@ -41,7 +41,7 @@ export function serializeCustomFunctionsAndLibs(ctx: SerializerBaseContext) {
   // `exportOpts`:
   // - If `useCustomFunctionsStub` is set, it means we will import the functions
   //   from a common "stub". It happens in:
-  //      - Live preview: We just read all code fuctions from `window` and
+  //      - Live preview: We just read all code functions from `window` and
   //        export them from `./custom-functions`.
   //      - Loader: For user-registered functions, we import them from the
   //        `@plasmicapp/loader-runtime-registry`, but for hostless functions,

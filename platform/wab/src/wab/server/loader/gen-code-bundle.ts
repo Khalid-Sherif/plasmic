@@ -1,4 +1,6 @@
+import { getSerializableConnectionOptions } from "@/wab/server/db/DbCon";
 import { DbMgr } from "@/wab/server/db/DbMgr";
+import { LoaderBundleOutput } from "@/wab/server/loader/module-bundler";
 import {
   extractProjectId,
   mkVersionToSync,
@@ -6,12 +8,15 @@ import {
   VersionToSync,
 } from "@/wab/server/loader/resolve-projects";
 import { logger } from "@/wab/server/observability";
-import { withSpan } from "@/wab/server/util/apm-util";
 import {
   loaderBundleCacheCounter,
   loaderCodegenCacheCounter,
 } from "@/wab/server/promstats";
-import { upsertS3CacheEntry } from "@/wab/server/util/s3-util";
+import { withSpan } from "@/wab/server/util/apm-util";
+import {
+  tryGetS3CacheEntry,
+  upsertS3CacheEntry,
+} from "@/wab/server/util/s3-util";
 import {
   CachedCodegenOutputBundle,
   ComponentReference,
@@ -24,7 +29,6 @@ import { unzip3 } from "@/wab/shared/collections";
 import { tuple } from "@/wab/shared/common";
 import { LocalizationKeyScheme } from "@/wab/shared/localization";
 import { createHash } from "crypto";
-import { getConnection } from "typeorm";
 
 /**
  * This is used for busting codegen caches.  You should increment this number if
@@ -42,8 +46,10 @@ import { getConnection } from "typeorm";
  * 18 - started returning list of component refs in codegen response to handle errors
  * 19 - fix css class name generation
  * 20 - style token overrides
+ * 21 - cached outputs with appDir=true include removed imports
+ * 22 - placeholder render modules and css are no longer emitted for non-hostless code components
  */
-export const LOADER_CACHE_BUST = "20";
+export const LOADER_CACHE_BUST = "22";
 
 /**
  * This represents the version of the loader API wire format; should reflect the
@@ -75,6 +81,11 @@ export async function genPublishedLoaderCodeBundle(
   }
 ) {
   const { projectVersions } = opts;
+
+  const cachedBundle = await tryGetCachedPublishedBundle(opts);
+  if (cachedBundle) {
+    return cachedBundle;
+  }
 
   const allProjectVersions = await withSpan(
     "loader-resolve-deps",
@@ -173,23 +184,7 @@ async function genLoaderCodeBundleForProjectVersions(
     skipHead?: boolean;
   }
 ) {
-  const exportOpts: ExportOpts = {
-    ...LOADER_CODEGEN_OPTS_DEFAULTS,
-    platform: (opts.platform ??
-      LOADER_CODEGEN_OPTS_DEFAULTS.platform) as ExportOpts["platform"],
-    platformOptions: opts.platformOptions,
-    defaultExportHostLessComponents: opts.loaderVersion > 2 ? false : true,
-    useComponentSubstitutionApi: opts.loaderVersion >= 6 ? true : false,
-    useGlobalVariantsSubstitutionApi: opts.loaderVersion >= 7 ? true : false,
-    useCodeComponentHelpersRegistry: opts.loaderVersion >= 10 ? true : false,
-    ...(opts.i18nKeyScheme && {
-      localization: {
-        keyScheme: opts.i18nKeyScheme ?? "content",
-        tagPrefix: opts.i18nTagPrefix,
-      },
-    }),
-    skipHead: opts.skipHead,
-  };
+  const exportOpts = makeExportOpts(opts);
 
   const codegenProject = async (
     projectId: string,
@@ -199,7 +194,7 @@ async function genLoaderCodeBundleForProjectVersions(
     const res = await pool.exec("codegen", [
       {
         scheme: "blackbox",
-        connectionOptions: getConnection().options,
+        connectionOptions: getSerializableConnectionOptions(),
         projectId,
         exportOpts: exportOpts,
         maybeVersionOrTag: version,
@@ -415,6 +410,73 @@ function makeExportOptsKey(opts: ExportOpts) {
   return createHash("sha256").update(str).digest("hex");
 }
 
+/** The subset of the loader options that feed into the codegen `ExportOpts`. */
+interface ExportOptsInputs {
+  platform?: string;
+  platformOptions: ExportPlatformOptions;
+  loaderVersion: number;
+  i18nKeyScheme?: LocalizationKeyScheme;
+  i18nTagPrefix: string | undefined;
+  skipHead?: boolean;
+}
+
+function makeExportOpts(opts: ExportOptsInputs): ExportOpts {
+  return {
+    ...LOADER_CODEGEN_OPTS_DEFAULTS,
+    platform: (opts.platform ??
+      LOADER_CODEGEN_OPTS_DEFAULTS.platform) as ExportOpts["platform"],
+    platformOptions: opts.platformOptions,
+    useComponentSubstitutionApi: true,
+    useGlobalVariantsSubstitutionApi: true,
+    useCodeComponentHelpersRegistry: opts.loaderVersion >= 10 ? true : false,
+    ...(opts.i18nKeyScheme && {
+      localization: {
+        keyScheme: opts.i18nKeyScheme ?? "content",
+        tagPrefix: opts.i18nTagPrefix,
+      },
+    }),
+    skipHead: opts.skipHead,
+  };
+}
+
+/**
+ * Probes the bundle cache before resolving deps or running codegen. Costs one
+ * extra S3 get on a miss, but lets a fully-cached published bundle skip all
+ * the db and worker-pool work that produces the very same key.
+ */
+async function tryGetCachedPublishedBundle(
+  opts: ExportOptsInputs & {
+    source: "prefill" | "live";
+    projectVersions: Record<string, VersionToSync>;
+    browserOnly: boolean;
+  }
+): Promise<LoaderBundleOutput | null> {
+  const exportOpts = makeExportOpts(opts);
+  const bundleKey = makeBundleBucketPath({
+    projectVersions: opts.projectVersions,
+    platform: exportOpts.platform,
+    loaderVersion: opts.loaderVersion,
+    browserOnly: opts.browserOnly,
+    exportOpts,
+  });
+  const cached = await withSpan("loader-bundle-cache-probe", async () =>
+    tryGetS3CacheEntry<LoaderBundleOutput>({
+      bucket: LOADER_ASSETS_BUCKET,
+      key: bundleKey,
+      deserialize: (str) => JSON.parse(str),
+    })
+  );
+  if (!cached) {
+    // Leave the miss to be counted by the upsertS3CacheEntry call downstream,
+    // which probes the same key again before computing.
+    return null;
+  }
+  loaderBundleCacheCounter.inc({ result: "hit", source: opts.source });
+  cached.bundleKey = bundleKey;
+  return cached;
+}
+
 export const _testonly = {
   makeBundleBucketPath,
+  makeExportOpts,
 };

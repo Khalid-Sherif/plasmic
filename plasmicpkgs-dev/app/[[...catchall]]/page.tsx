@@ -1,5 +1,5 @@
 import { PLASMIC } from "@/plasmic-init";
-import { PlasmicClientRootProvider } from "@/plasmic-init-client";
+import { ClientPlasmicRootProvider } from "@/plasmic-init-client";
 import {
   ComponentRenderData,
   PlasmicComponent,
@@ -32,10 +32,11 @@ export async function generateStaticParams(): Promise<Params[]> {
 
 interface LoaderPageProps {
   params: Promise<Params>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata(
-  { params }: LoaderPageProps,
+  { params, searchParams }: LoaderPageProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { componentData } = await getPageData(params);
@@ -44,39 +45,42 @@ export async function generateMetadata(
     return parent as Promise<Metadata>;
   }
   const pageMeta = componentData.entryCompMetas[0];
-  const metadata = await PLASMIC.unstable__generateMetadata(componentData, {
+  const metadata = await PLASMIC.getPlasmicMetadata(componentData, {
     params: pageMeta.params ?? {},
-    query: {},
+    query: searchParams,
   });
 
   return { ...(await parent), ...metadata };
 }
 
-export default async function PlasmicLoaderPage({ params }: LoaderPageProps) {
-  const { pagePath, componentData } = await getPageData(params);
+export default async function PlasmicLoaderPage({
+  params,
+  searchParams,
+}: LoaderPageProps) {
+  const { componentData } = await getPageData(params);
 
   if (!componentData) {
     notFound();
   }
   const pageMeta = componentData.entryCompMetas[0];
-  const prefetchedQueryData = await PLASMIC.unstable__getServerQueriesData(
+  const prefetchedQueryData = await PLASMIC.getPlasmicQueriesData(
     componentData,
     {
-      pagePath,
       params: pageMeta.params,
-      query: {},
+      query: searchParams,
     }
   );
 
   return (
-    <PlasmicClientRootProvider
+    <ClientPlasmicRootProvider
       prefetchedData={componentData}
       prefetchedQueryData={prefetchedQueryData}
       pageRoute={pageMeta.path}
       pageParams={pageMeta.params}
+      trackQueryParams
     >
       <PlasmicComponent component={pageMeta.displayName} />
-    </PlasmicClientRootProvider>
+    </ClientPlasmicRootProvider>
   );
 }
 

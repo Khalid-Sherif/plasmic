@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @vitest-environment node */
 import { getLastBundleVersion } from "@/wab/server/db/BundleMigrator";
 import { ensureDbConnection } from "@/wab/server/db/DbCon";
 import { seedTestUserAndProjects } from "@/wab/server/db/DbInit";
@@ -108,26 +108,30 @@ describe("loader", () => {
 
     const versionedRes = await publicApi.rawReq(
       "get",
-      "/api/v1/loader/code/versioned?cb=20&platform=nextjs&loaderVersion=0"
+      "/api/v1/loader/code/versioned?cb=22&platform=nextjs&loaderVersion=7"
     );
     expect(versionedRes.status()).toEqual(400);
   });
 
   it("resolves polyfill project", async () => {
-    const res = await publicApi.getPublishedLoaderAssets([polyfillProject], {});
+    const res = await publicApi.getPublishedLoaderAssets([polyfillProject], {
+      loaderVersion: "7",
+    });
     expect(res.status()).toEqual(200);
     const body = await res.json();
     expect(body.redirectUrl).toEqual(
-      `/api/v1/loader/code/versioned?cb=20&platform=react&loaderVersion=0&projectId=${polyfillProject.id}%400.0.1`
+      `/api/v1/loader/code/versioned?cb=22&platform=react&loaderVersion=7&projectId=${polyfillProject.id}%400.0.1`
     );
     expect(res.headers()["cache-control"]).toEqual("s-maxage=30");
   });
 
   it("resolves 1 project", async () => {
-    const res = await publicApi.getPublishedLoaderAssets([projects[0]], {});
+    const res = await publicApi.getPublishedLoaderAssets([projects[0]], {
+      loaderVersion: "7",
+    });
     expect(res.status()).toEqual(302);
     expect(res.headers()["location"]).toEqual(
-      `/api/v1/loader/code/versioned?cb=20&platform=react&loaderVersion=0&projectId=${projects[0].id}%400.0.2`
+      `/api/v1/loader/code/versioned?cb=22&platform=react&loaderVersion=7&projectId=${projects[0].id}%400.0.2`
     );
     expect(res.headers()["cache-control"]).toEqual("s-maxage=30");
   });
@@ -144,11 +148,13 @@ describe("loader", () => {
     }
 
     // request in reverse order
-    const res = await publicApi.getPublishedLoaderAssets([b, a], {});
+    const res = await publicApi.getPublishedLoaderAssets([b, a], {
+      loaderVersion: "7",
+    });
     expect(res.status()).toEqual(302);
     // expect in sorted order
     expect(res.headers()["location"]).toEqual(
-      `/api/v1/loader/code/versioned?cb=20&platform=react&loaderVersion=0&projectId=${a.id}%400.0.2&projectId=${b.id}%400.0.2`
+      `/api/v1/loader/code/versioned?cb=22&platform=react&loaderVersion=7&projectId=${a.id}%400.0.2&projectId=${b.id}%400.0.2`
     );
     expect(res.headers()["cache-control"]).toEqual("s-maxage=30");
   });
@@ -182,7 +188,7 @@ describe("loader", () => {
     );
     expect(redirectRes.status()).toEqual(302);
     expect(redirectRes.headers()["location"]).toEqual(
-      `/api/v1/loader/html/versioned/${projects[0].id}@0.0.2/Homepage?cb=20&embedHydrate=0&hydrate=0&componentProps=%7B%7D&globalVariants=%5B%5D&prepass=0`
+      `/api/v1/loader/html/versioned/${projects[0].id}@0.0.2/Homepage?cb=22&embedHydrate=0&hydrate=0&componentProps=%7B%7D&globalVariants=%5B%5D&prepass=0`
     );
     expect(redirectRes.headers()["cache-control"]).toEqual("s-maxage=30");
 
@@ -202,7 +208,7 @@ describe("loader", () => {
     );
     expect(redirectRes.status()).toEqual(302);
     expect(redirectRes.headers()["location"]).toEqual(
-      `/api/v1/loader/html/versioned/${projects[0].id}@0.0.2/Homepage?cb=20&embedHydrate=1&hydrate=1&componentProps=%7B%7D&globalVariants=%5B%5D&prepass=0`
+      `/api/v1/loader/html/versioned/${projects[0].id}@0.0.2/Homepage?cb=22&embedHydrate=1&hydrate=1&componentProps=%7B%7D&globalVariants=%5B%5D&prepass=0`
     );
     expect(redirectRes.headers()["cache-control"]).toEqual("s-maxage=30");
 
@@ -222,7 +228,7 @@ describe("loader", () => {
     );
     expect(redirectRes.status()).toEqual(302);
     expect(redirectRes.headers()["location"]).toEqual(
-      `/api/v1/loader/html/versioned/${projects[0].id}@0.0.2/NonExistentComponent?cb=20&embedHydrate=0&hydrate=0&componentProps=%7B%7D&globalVariants=%5B%5D&prepass=0`
+      `/api/v1/loader/html/versioned/${projects[0].id}@0.0.2/NonExistentComponent?cb=22&embedHydrate=0&hydrate=0&componentProps=%7B%7D&globalVariants=%5B%5D&prepass=0`
     );
     expect(redirectRes.headers()["cache-control"]).toEqual("s-maxage=30");
 

@@ -62,7 +62,10 @@ import {
   TokenValueResolver,
   siteFinalStyleTokensAllDeps,
 } from "@/wab/shared/core/site-style-tokens";
-import { sourceMatchThemeStyle } from "@/wab/shared/core/styles";
+import {
+  getDefaultStyleTag,
+  sourceMatchThemeStyle,
+} from "@/wab/shared/core/styles";
 import {
   isTplComponent,
   isTplNamable,
@@ -81,6 +84,7 @@ import {
   isTargetOverwritten,
 } from "@/wab/shared/defined-indicator";
 import { getEffectiveVariantSetting } from "@/wab/shared/effective-variant-setting";
+import { BASE_THEMABLE_TAG } from "@/wab/shared/html";
 import {
   Expr,
   RawText,
@@ -148,7 +152,7 @@ export function getStylePropValue(
       val = derefTokenRefs(allTokens, val, vsh);
     }
 
-    const parsedBgImg: BackgroundLayer = swallow(() =>
+    const parsedBgImg: BackgroundLayer | null = swallow(() =>
       parseCss(val, { startRule: "backgroundLayer" })
     );
 
@@ -158,7 +162,7 @@ export function getStylePropValue(
       <span>
         <ColorSwatch color={val} />
       </span>
-    ) : !(parsedBgImg.image instanceof NoneBackground) ? (
+    ) : parsedBgImg && !(parsedBgImg.image instanceof NoneBackground) ? (
       <div
         style={{
           width: 24,
@@ -243,6 +247,7 @@ export const SourceValue = observer(function SourceValue(props: {
           <div>
             <EditMixinButton
               mixin={source.theme.defaultStyle}
+              themeTag={BASE_THEMABLE_TAG}
               className="defined-indicator__edit-button code flex flex-vcenter"
               onShowPopup={onShowPopup}
             >
@@ -271,21 +276,18 @@ export const SourceValue = observer(function SourceValue(props: {
     }
   } else if (source.type === "themeTag") {
     if (site.themes.includes(source.theme)) {
+      const themeStyle = ensure(
+        source.theme.styles.find((s) => sourceMatchThemeStyle(s, source)),
+        "Theme must exist"
+      );
       return (
         <Tooltip title={`Edit default ${source.selector} style`}>
           <div>
             <EditMixinButton
-              mixin={
-                ensure(
-                  source.theme.styles.find((s) =>
-                    sourceMatchThemeStyle(s, source)
-                  ),
-                  "Theme must exist"
-                ).style
-              }
+              mixin={themeStyle.style}
+              themeTag={getDefaultStyleTag(themeStyle)}
               className="defined-indicator__edit-button code flex flex-vcenter"
               onShowPopup={onShowPopup}
-              tag={source.selector.split(":")[0]}
             >
               {getStylePropValue(
                 clientTokenResolver,
@@ -316,6 +318,7 @@ export const SourceValue = observer(function SourceValue(props: {
           <div>
             <EditMixinButton
               mixin={source.mixin}
+              themeTag={undefined}
               className="defined-indicator__edit-button code flex flex-vcenter"
               onShowPopup={onShowPopup}
             >

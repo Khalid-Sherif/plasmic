@@ -48,7 +48,6 @@ export type ComponentContextConfig<Props, R> = ContextDependentConfig<
 
 export interface PropTypeBase<Ctx extends any[]> extends CommonTypeBase {
   displayName?: string;
-  required?: boolean;
   readOnly?: boolean | ContextDependentConfig<Ctx, boolean>;
   /**
    * If set to true, the component will be remounted when the prop value is updated.
@@ -56,7 +55,7 @@ export interface PropTypeBase<Ctx extends any[]> extends CommonTypeBase {
    */
   forceRemount?: boolean;
   /**
-   * If true, the prop can't be overriden in different variants.
+   * If true, the prop can't be overridden in different variants.
    */
   invariantable?: boolean;
   /**
@@ -231,7 +230,7 @@ export interface RichSlotType<P> {
    */
   allowedComponents?: string[];
   /**
-   * Wheter Plasmic Components with a root component included in the
+   * Whether Plasmic Components with a root component included in the
    * "allowedComponents" list are valid or not.
    * Only used if the "allowedComponents" list is set.
    */

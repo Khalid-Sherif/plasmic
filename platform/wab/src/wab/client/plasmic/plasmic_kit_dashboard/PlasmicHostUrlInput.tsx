@@ -14,34 +14,28 @@
 import * as React from "react";
 
 import {
-  Flex as Flex__,
-  SingleBooleanChoiceArg,
-  SingleChoiceArg,
-  Stack as Stack__,
-  StrictProps,
   classNames,
   createPlasmicElementProxy,
   deriveRenderOpts,
-  ensureGlobalVariants,
+  Flex as Flex__,
   generateStateOnChangeProp,
   generateStateValueProp,
   hasVariant,
+  SingleBooleanChoiceArg,
+  SingleChoiceArg,
+  StrictProps,
   useDollarState,
 } from "@plasmicapp/react-web";
 import { useDataEnv } from "@plasmicapp/react-web/lib/host";
 
-import HostProtocolSelect from "../../components/HostProtocolSelect"; // plasmic-import: 6_CfQ5GVLku/component
-import HostProtocolSelect__Option from "../../components/HostProtocolSelect__Option"; // plasmic-import: aHgWgR3OVni/component
+import TextInput from "../../components/plexus/TextInput"; // plasmic-import: J_e2eE41048e/component
 import Button from "../../components/widgets/Button"; // plasmic-import: SEF-sRmSoqV5c/component
-
-import { useEnvironment } from "../plasmic_kit_pricing/PlasmicGlobalVariant__Environment"; // plasmic-import: hIjF9NLAUKG-/globalVariant
+import { _useGlobalVariants } from "./plasmic"; // plasmic-import: ooL7EhXDmFQWnW9sxtchhE/projectModule
+import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-import: ooL7EhXDmFQWnW9sxtchhE/styleTokensProvider
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import plasmic_plasmic_kit_pricing_css from "../plasmic_kit_pricing/plasmic_plasmic_kit_pricing.module.css"; // plasmic-import: ehckhYnyDHgCBbV47m9bkf/projectcss
-import plasmic_plasmic_kit_color_tokens_css from "../plasmic_kit_q_4_color_tokens/plasmic_plasmic_kit_q_4_color_tokens.module.css"; // plasmic-import: 95xp9cYcv7HrNWpFWWhbcv/projectcss
-import projectcss from "../PP__plasmickit_dashboard.module.css"; // plasmic-import: ooL7EhXDmFQWnW9sxtchhE/projectcss
-import plasmic_plasmic_kit_design_system_deprecated_css from "../PP__plasmickit_design_system.module.css"; // plasmic-import: tXkSR39sgCDWSitZxC5xFV/projectcss
+import "../PP__plasmickit_dashboard.css"; // plasmic-import: ooL7EhXDmFQWnW9sxtchhE/projectcss
 import sty from "./PlasmicHostUrlInput.module.css"; // plasmic-import: XxbnrpTDqu/css
 
 import InfoIcon from "../plasmic_kit/PlasmicIcon__Info"; // plasmic-import: BjAly3N4fWuWe/icon
@@ -73,8 +67,7 @@ export const PlasmicHostUrlInput__ArgProps = new Array<ArgPropType>();
 
 export type PlasmicHostUrlInput__OverridesType = {
   root?: Flex__<"div">;
-  hostProtocolSelect?: Flex__<typeof HostProtocolSelect>;
-  urlInput?: Flex__<"input">;
+  urlInput?: Flex__<typeof TextInput>;
   clearButton?: Flex__<typeof Button>;
   confirmButton?: Flex__<typeof Button>;
 };
@@ -119,88 +112,63 @@ function PlasmicHostUrlInput__RenderFunc(props: {
   const stateSpecs: Parameters<typeof useDollarState>[0] = React.useMemo(
     () => [
       {
-        path: "hostProtocolSelect.value",
-        type: "private",
-        variableType: "text",
-        initFunc: ({ $props, $state, $queries, $ctx }) => "https://",
-      },
-      {
-        path: "urlInput.value",
-        type: "private",
-        variableType: "text",
-        initFunc: ({ $props, $state, $queries, $ctx }) => undefined,
-      },
-      {
         path: "urlValidationStatus",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.urlValidationStatus,
       },
       {
         path: "urlPathStatus",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.urlPathStatus,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
+          $props.urlPathStatus,
       },
       {
         path: "showPlasmicHostValidations",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.showPlasmicHostValidations,
+      },
+      {
+        path: "urlInput.value",
+        type: "private",
+        variableType: "text",
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
+          $props["defaultValue"],
       },
     ],
     [$props, $ctx, $refs]
   );
+
+  const globalVariants = _useGlobalVariants();
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
     $queries: {},
+    $q: {},
     $refs,
   });
 
-  const globalVariants = ensureGlobalVariants({
-    environment: useEnvironment(),
-  });
+  const styleTokensClassNames = _useStyleTokens();
 
   return (
-    <Stack__
-      as={"div"}
+    <div
       data-plasmic-name={"root"}
       data-plasmic-override={overrides.root}
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
-      hasGap={true}
       className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
-        projectcss.plasmic_tokens,
-        plasmic_plasmic_kit_design_system_deprecated_css.plasmic_tokens,
-        plasmic_plasmic_kit_color_tokens_css.plasmic_tokens,
-        plasmic_plasmic_kit_pricing_css.plasmic_tokens,
+        "all",
+        "root_reset_ooL7EhXDmFQWnW9sxtchhE",
+        "plasmic_default_styles",
+        "plasmic_mixins",
+        styleTokensClassNames,
         sty.root,
         {
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
-          [plasmic_plasmic_kit_pricing_css.global_environment_website]:
-            hasVariant(globalVariants, "environment", "website"),
           [sty.rooturlPathStatus_nonStandard]: hasVariant(
             $state,
             "urlPathStatus",
@@ -219,10 +187,8 @@ function PlasmicHostUrlInput__RenderFunc(props: {
         }
       )}
     >
-      <Stack__
-        as={"div"}
-        hasGap={true}
-        className={classNames(projectcss.all, sty.freeBox__ycLvv, {
+      <div
+        className={classNames("all", sty.freeBox__ycLvv, {
           [sty.freeBoxurlValidationStatus_invalid__ycLvvVmYfF]: hasVariant(
             $state,
             "urlValidationStatus",
@@ -236,37 +202,29 @@ function PlasmicHostUrlInput__RenderFunc(props: {
         })}
       >
         <div
-          className={classNames(
-            projectcss.all,
-            projectcss.__wab_text,
-            sty.text__g2NsR,
-            {
-              [sty.texturlValidationStatus_invalid__g2NsRvmYfF]: hasVariant(
-                $state,
-                "urlValidationStatus",
-                "invalid"
-              ),
-              [sty.texturlValidationStatus_valid__g2NsR0YpMn]: hasVariant(
-                $state,
-                "urlValidationStatus",
-                "valid"
-              ),
-            }
-          )}
+          className={classNames("all", "__wab_text", sty.text__g2NsR, {
+            [sty.texturlValidationStatus_invalid__g2NsRvmYfF]: hasVariant(
+              $state,
+              "urlValidationStatus",
+              "invalid"
+            ),
+            [sty.texturlValidationStatus_valid__g2NsR0YpMn]: hasVariant(
+              $state,
+              "urlValidationStatus",
+              "valid"
+            ),
+          })}
         >
           {"URL:"}
         </div>
-        <HostProtocolSelect
-          data-plasmic-name={"hostProtocolSelect"}
-          data-plasmic-override={overrides.hostProtocolSelect}
-          className={classNames("__wab_instance", sty.hostProtocolSelect)}
+        <TextInput
+          data-plasmic-name={"urlInput"}
+          data-plasmic-override={overrides.urlInput}
           onChange={async (...eventArgs: any) => {
-            ((...eventArgs) => {
-              generateStateOnChangeProp($state, [
-                "hostProtocolSelect",
-                "value",
-              ])(eventArgs[0]);
-            }).apply(null, eventArgs);
+            generateStateOnChangeProp($state, ["urlInput", "value"]).apply(
+              null,
+              eventArgs
+            );
 
             if (
               eventArgs.length > 1 &&
@@ -276,61 +234,8 @@ function PlasmicHostUrlInput__RenderFunc(props: {
               return;
             }
           }}
-          placeholder={"Select\u2026"}
-          value={generateStateValueProp($state, [
-            "hostProtocolSelect",
-            "value",
-          ])}
-        >
-          <HostProtocolSelect__Option
-            className={classNames("__wab_instance", sty.option__jSgyS)}
-            textValue={"https://"}
-            value={"https://"}
-          >
-            {"https://"}
-          </HostProtocolSelect__Option>
-          <HostProtocolSelect__Option
-            className={classNames("__wab_instance", sty.option__nopaD)}
-            textValue={"http://"}
-            value={"http://"}
-          >
-            {"http://"}
-          </HostProtocolSelect__Option>
-        </HostProtocolSelect>
-        <input
-          data-plasmic-name={"urlInput"}
-          data-plasmic-override={overrides.urlInput}
-          className={classNames(
-            projectcss.all,
-            projectcss.input,
-            sty.urlInput,
-            {
-              [sty.urlInputurlValidationStatus_invalid]: hasVariant(
-                $state,
-                "urlValidationStatus",
-                "invalid"
-              ),
-              [sty.urlInputurlValidationStatus_valid]: hasVariant(
-                $state,
-                "urlValidationStatus",
-                "valid"
-              ),
-            }
-          )}
-          onChange={async (...eventArgs: any) => {
-            ((e) => {
-              generateStateOnChangeProp($state, ["urlInput", "value"])(
-                e.target.value
-              );
-            }).apply(null, eventArgs);
-          }}
-          placeholder={"my-app.com/plasmic-host"}
-          ref={(ref) => {
-            $refs["urlInput"] = ref;
-          }}
-          size={1}
-          type={"text"}
-          value={generateStateValueProp($state, ["urlInput", "value"]) ?? ""}
+          placeholder={"https://my-app.com/plasmic-host"}
+          value={generateStateValueProp($state, ["urlInput", "value"])}
         />
 
         <Button
@@ -341,25 +246,19 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           disabled={true}
           endIcon={
             <ChevronDownSvgIcon
-              className={classNames(projectcss.all, sty.svg__vgMoN)}
+              className={classNames("all", sty.svg__vgMoN)}
               role={"img"}
             />
           }
           size={"wide"}
           startIcon={
             <ArrowRightSvgIcon
-              className={classNames(projectcss.all, sty.svg__wNkJa)}
+              className={classNames("all", sty.svg__wNkJa)}
               role={"img"}
             />
           }
         >
-          <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__sYxzC
-            )}
-          >
+          <div className={classNames("all", "__wab_text", sty.text__sYxzC)}>
             {"Clear"}
           </div>
         </Button>
@@ -371,34 +270,26 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           disabled={true}
           endIcon={
             <ChevronDownSvgIcon
-              className={classNames(projectcss.all, sty.svg__idqB)}
+              className={classNames("all", sty.svg__idqB)}
               role={"img"}
             />
           }
           size={"wide"}
           startIcon={
             <ArrowRightSvgIcon
-              className={classNames(projectcss.all, sty.svg__x95OL)}
+              className={classNames("all", sty.svg__x95OL)}
               role={"img"}
             />
           }
           type={["primary"]}
         >
-          <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__ijKr
-            )}
-          >
+          <div className={classNames("all", "__wab_text", sty.text__ijKr)}>
             {"Confirm"}
           </div>
         </Button>
-      </Stack__>
-      <Stack__
-        as={"div"}
-        hasGap={true}
-        className={classNames(projectcss.all, sty.freeBox__bFmsS, {
+      </div>
+      <div
+        className={classNames("all", sty.freeBox__bFmsS, {
           [sty.freeBoxshowPlasmicHostValidations__bFmsSiDwTg]: hasVariant(
             $state,
             "showPlasmicHostValidations",
@@ -406,10 +297,8 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           ),
         })}
       >
-        <Stack__
-          as={"div"}
-          hasGap={true}
-          className={classNames(projectcss.all, sty.freeBox__oOj3, {
+        <div
+          className={classNames("all", sty.freeBox__oOj3, {
             [sty.freeBoxurlValidationStatus_invalid__oOj3VmYfF]: hasVariant(
               $state,
               "urlValidationStatus",
@@ -423,7 +312,7 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           })}
         >
           <InfoIcon
-            className={classNames(projectcss.all, sty.svg__k9HiC, {
+            className={classNames("all", sty.svg__k9HiC, {
               [sty.svgurlValidationStatus_invalid__k9HiCvmYfF]: hasVariant(
                 $state,
                 "urlValidationStatus",
@@ -439,36 +328,35 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           />
 
           <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__dSWc,
-              {
-                [sty.textshowPlasmicHostValidations__dSWCiDwTg]: hasVariant(
+            className={classNames("all", "__wab_text", sty.text__dSWc, {
+              [sty.textshowPlasmicHostValidations__dSWCiDwTg]: hasVariant(
+                $state,
+                "showPlasmicHostValidations",
+                "showPlasmicHostValidations"
+              ),
+              [sty.texturlValidationStatus_invalid__dSWcvmYfF]: hasVariant(
+                $state,
+                "urlValidationStatus",
+                "invalid"
+              ),
+              [sty.texturlValidationStatus_invalid_showPlasmicHostValidations__dSWcvmYfFIDwTg]:
+                hasVariant(
                   $state,
                   "showPlasmicHostValidations",
                   "showPlasmicHostValidations"
-                ),
-                [sty.texturlValidationStatus_invalid__dSWcvmYfF]: hasVariant(
-                  $state,
-                  "urlValidationStatus",
-                  "invalid"
-                ),
-                [sty.texturlValidationStatus_valid__dSWc0YpMn]: hasVariant(
-                  $state,
-                  "urlValidationStatus",
-                  "valid"
-                ),
-              }
-            )}
+                ) && hasVariant($state, "urlValidationStatus", "invalid"),
+              [sty.texturlValidationStatus_valid__dSWc0YpMn]: hasVariant(
+                $state,
+                "urlValidationStatus",
+                "valid"
+              ),
+            })}
           >
-            {"Please enter a valid URL. Note that spaces are not allowed."}
+            {"Please enter a valid URL."}
           </div>
-        </Stack__>
-        <Stack__
-          as={"div"}
-          hasGap={true}
-          className={classNames(projectcss.all, sty.freeBox__g5LjN, {
+        </div>
+        <div
+          className={classNames("all", sty.freeBox__g5LjN, {
             [sty.freeBoxurlValidationStatus_invalid__g5LjNvmYfF]: hasVariant(
               $state,
               "urlValidationStatus",
@@ -482,7 +370,7 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           })}
         >
           <InfoIcon
-            className={classNames(projectcss.all, sty.svg__pyf5U, {
+            className={classNames("all", sty.svg__pyf5U, {
               [sty.svgurlPathStatus_nonStandard__pyf5UjMiBj]: hasVariant(
                 $state,
                 "urlPathStatus",
@@ -498,56 +386,46 @@ function PlasmicHostUrlInput__RenderFunc(props: {
           />
 
           <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__tgz1I,
-              {
-                [sty.texturlPathStatus_nonStandard__tgz1IjMiBj]: hasVariant(
-                  $state,
-                  "urlPathStatus",
-                  "nonStandard"
-                ),
-                [sty.texturlPathStatus_standard__tgz1IQuOX]: hasVariant(
-                  $state,
-                  "urlPathStatus",
-                  "standard"
-                ),
-                [sty.texturlValidationStatus_valid__tgz1I0YpMn]: hasVariant(
-                  $state,
-                  "urlValidationStatus",
-                  "valid"
-                ),
-              }
-            )}
+            className={classNames("all", "__wab_text", sty.text__tgz1I, {
+              [sty.texturlPathStatus_nonStandard__tgz1IjMiBj]: hasVariant(
+                $state,
+                "urlPathStatus",
+                "nonStandard"
+              ),
+              [sty.texturlPathStatus_standard__tgz1IQuOX]: hasVariant(
+                $state,
+                "urlPathStatus",
+                "standard"
+              ),
+              [sty.texturlValidationStatus_valid__tgz1I0YpMn]: hasVariant(
+                $state,
+                "urlValidationStatus",
+                "valid"
+              ),
+            })}
           >
             <React.Fragment>
               <React.Fragment>
                 {"For standard configuration, the URL path should end with "}
               </React.Fragment>
               <span
-                className={"plasmic_default__all plasmic_default__span"}
+                className={
+                  "plasmic_default__all plasmic_default__span plasmic_default__span__ooL7E"
+                }
                 style={{ fontWeight: 700 }}
               >
                 {"/plasmic-host"}
               </span>
             </React.Fragment>
           </div>
-        </Stack__>
-      </Stack__>
-    </Stack__>
+        </div>
+      </div>
+    </div>
   ) as React.ReactElement | null;
 }
 
 const PlasmicDescendants = {
-  root: [
-    "root",
-    "hostProtocolSelect",
-    "urlInput",
-    "clearButton",
-    "confirmButton",
-  ],
-  hostProtocolSelect: ["hostProtocolSelect"],
+  root: ["root", "urlInput", "clearButton", "confirmButton"],
   urlInput: ["urlInput"],
   clearButton: ["clearButton"],
   confirmButton: ["confirmButton"],
@@ -557,8 +435,7 @@ type DescendantsType<T extends NodeNameType> =
   (typeof PlasmicDescendants)[T][number];
 type NodeDefaultElementType = {
   root: "div";
-  hostProtocolSelect: typeof HostProtocolSelect;
-  urlInput: "input";
+  urlInput: typeof TextInput;
   clearButton: typeof Button;
   confirmButton: typeof Button;
 };
@@ -574,7 +451,8 @@ type NodeComponentProps<T extends NodeNameType> =
     variants?: PlasmicHostUrlInput__VariantsArgs;
     args?: PlasmicHostUrlInput__ArgsType;
     overrides?: NodeOverridesType<T>;
-  } & Omit<PlasmicHostUrlInput__VariantsArgs, ReservedPropsType> & // Specify variants directly as props
+  } & // Specify variants directly as props
+  Omit<PlasmicHostUrlInput__VariantsArgs, ReservedPropsType> &
     // Specify args directly as props
     Omit<PlasmicHostUrlInput__ArgsType, ReservedPropsType> &
     // Specify overrides for each element directly as props
@@ -623,7 +501,6 @@ export const PlasmicHostUrlInput = Object.assign(
   makeNodeComponent("root"),
   {
     // Helper components rendering sub-elements
-    hostProtocolSelect: makeNodeComponent("hostProtocolSelect"),
     urlInput: makeNodeComponent("urlInput"),
     clearButton: makeNodeComponent("clearButton"),
     confirmButton: makeNodeComponent("confirmButton"),

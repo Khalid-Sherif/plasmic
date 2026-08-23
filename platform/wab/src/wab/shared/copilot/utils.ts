@@ -1,43 +1,106 @@
 import { TplMgr } from "@/wab/shared/TplMgr";
 import { VariantTplMgr } from "@/wab/shared/VariantTplMgr";
-import { VariantCombo, getAllVariantsForTpl } from "@/wab/shared/Variants";
+import {
+  VariantCombo,
+  getAllVariantsForTpl,
+  getBaseVariant,
+} from "@/wab/shared/Variants";
+import { toVarName } from "@/wab/shared/codegen/util";
+import { ensure, uniqueName } from "@/wab/shared/common";
 import { getComponentArenaBaseFrame } from "@/wab/shared/component-arenas";
 import {
   GlobalVariantFrame,
   TransientComponentVariantFrame,
 } from "@/wab/shared/component-frame";
+import { tryGetComponentByUuid } from "@/wab/shared/core/components";
+import { mkVar } from "@/wab/shared/core/lang";
 import { getDedicatedArena } from "@/wab/shared/core/sites";
-import { flattenTpls } from "@/wab/shared/core/tpls";
+import {
+  EventHandlerKeyType,
+  flattenTpls,
+  getAllEventHandlersOfAttrType,
+  getAllEventHandlersOfParamType,
+  isTplComponent,
+  isTplTag,
+  tryGetTplByUuid,
+} from "@/wab/shared/core/tpls";
 import {
   Component,
   ComponentArena,
+  CustomCode,
+  Interaction,
+  ObjectPath,
   PageArena,
+  Rep,
   Site,
   TplNode,
+  isKnownEventHandler,
 } from "@/wab/shared/model/classes";
 
 /**
  * Find a component by UUID. Throws if not found.
  */
 export function getComponentByUuid(site: Site, uuid: string): Component {
-  const component = site.components.find((c) => c.uuid === uuid);
-  if (!component) {
-    throw new Error(`Component with UUID "${uuid}" not found.`);
-  }
-  return component;
+  return ensure(
+    tryGetComponentByUuid(site, uuid),
+    () => `Component with UUID "${uuid}" not found.`
+  );
 }
 
 /**
  * Find a TplNode by UUID within a component's tpl tree. Throws if not found.
  */
 export function getTplByUuid(component: Component, uuid: string): TplNode {
-  const tpl = flattenTpls(component.tplTree).find((t) => t.uuid === uuid);
-  if (!tpl) {
-    throw new Error(
+  return ensure(
+    tryGetTplByUuid(component, uuid),
+    () =>
       `Element with UUID "${uuid}" not found in component "${component.name}".`
-    );
+  );
+}
+
+/**
+ * Find an interaction step by its uuid within a component's tpl tree,
+ * along with the element and event-handler slot it lives in. Only
+ * base-variant tag attrs and function-typed instance args are searched
+ * (the slots the interaction operations manage).
+ */
+export function findInteractionInComponent(
+  component: Component,
+  interactionUuid: string
+):
+  | {
+      tpl: TplNode;
+      eventName: string;
+      eventHandlerKey: EventHandlerKeyType;
+      interaction: Interaction;
+    }
+  | undefined {
+  for (const tpl of flattenTpls(component.tplTree)) {
+    if (!isTplTag(tpl) && !isTplComponent(tpl)) {
+      continue;
+    }
+    const eventHandlersData = [
+      ...getAllEventHandlersOfAttrType(component, tpl),
+      ...getAllEventHandlersOfParamType(component, tpl),
+    ];
+    for (const eventHandler of eventHandlersData) {
+      if (!isKnownEventHandler(eventHandler.expr)) {
+        continue;
+      }
+      const interaction = eventHandler.expr.interactions.find(
+        (it) => it.uuid === interactionUuid
+      );
+      if (interaction) {
+        return {
+          tpl,
+          eventName: eventHandler.eventName,
+          eventHandlerKey: eventHandler.eventHandlerKey,
+          interaction,
+        };
+      }
+    }
   }
-  return tpl;
+  return undefined;
 }
 
 /**
@@ -81,6 +144,29 @@ export function getVariantsByUuids(
   return { variants, invalidUuids };
 }
 
+export function getComponentVariantCombo(
+  site: Site,
+  component: Component,
+  variantUuids: string[] | undefined
+): VariantCombo {
+  if (!variantUuids?.length) {
+    return [getBaseVariant(component)];
+  }
+
+  const result = getVariantsByUuids(variantUuids, {
+    component,
+    site,
+  });
+  if (result.invalidUuids.length) {
+    throw new Error(
+      `Variant(s) not found: ${result.invalidUuids
+        .map((u) => `"${u}"`)
+        .join(", ")}.`
+    );
+  }
+  return result.variants;
+}
+
 /**
  * Create a VariantTplMgr for a component by looking up its ArenaFrame
  * from the site's arena structure.
@@ -109,4 +195,20 @@ export function getComponentArenaAndVariantTplMgr(
     new GlobalVariantFrame(site, arenaFrame)
   );
   return { vtm, arena };
+}
+
+/**
+ * Builds a `Rep`, normalizing item/index var names to valid, distinct JS identifiers.
+ */
+export function mkNormalizedRep(
+  collection: CustomCode | ObjectPath,
+  itemName?: string,
+  indexName?: string
+): Rep {
+  const element = toVarName(itemName || "currentItem");
+  const index = uniqueName([element], toVarName(indexName || "currentIndex"), {
+    separator: "",
+    normalize: toVarName,
+  });
+  return new Rep({ collection, element: mkVar(element), index: mkVar(index) });
 }

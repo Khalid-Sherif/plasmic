@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/react-aria",
-  "version": "0.0.181",
+  "version": "0.0.196",
   "description": "Plasmic registration calls for react-aria based components",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/react-aria"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/react-aria.esm.js",
@@ -37,14 +44,13 @@
     "skinny"
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.mjs && yarn tsc --emitDeclarationOnly --declaration src/index.tsx --incremental --tsBuildInfoFile ./dist/.tsbuildinfo  --skipLibCheck --lib esnext,dom,dom.iterable --jsx react --esModuleInterop --strict --outDir ./dist/ && cp ./dist/*.d.ts skinny/ && rm skinny/index.d.ts",
-    "prepare": "if-env PREPARE_NO_BUILD=true || yarn build",
+    "build": "rollup -c rollup.config.mjs && tsc --emitDeclarationOnly --declaration src/index.tsx --incremental --tsBuildInfoFile ./dist/.tsbuildinfo  --skipLibCheck --lib esnext,dom,dom.iterable --jsx react --esModuleInterop --strict --outDir ./dist/ && cp ./dist/*.d.ts skinny/ && rm skinny/index.d.ts",
     "clean": "rm -rf dist/ skinny/*.ts skinny/*.map skinny/*.js",
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build",
     "test-storybook": "test-storybook",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test",
-    "upgrade-aria": "yarn upgrade --latest --scope @react-stately && yarn upgrade --latest --scope @react-aria && yarn upgrade --latest --scope react-aria-components"
+    "test": "vitest run",
+    "upgrade-aria": "pnpm update --latest \"@react-stately/*\" \"@react-aria/*\" react-aria-components"
   },
   "dependencies": {
     "@react-aria/i18n": "^3.12.9",
@@ -54,7 +60,7 @@
     "react-stately": "^3.38.0"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
+    "@plasmicapp/host": "2.0.17",
     "@rollup/plugin-commonjs": "^11.0.0",
     "@rollup/plugin-json": "^4.0.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
@@ -65,7 +71,9 @@
     "react-dom": "^18.2.0",
     "rollup": "^3.10.1",
     "rollup-plugin-esbuild": "^5.0.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "@plasmicapp/host": ">=1.0.0",

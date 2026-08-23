@@ -1,6 +1,5 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { ensure } from "./lang-utils";
 import useForceUpdate from "./useForceUpdate";
 
 declare global {
@@ -29,12 +28,8 @@ function getHashParams() {
   return new URLSearchParams(location.hash.replace(/^#/, "?"));
 }
 
-function getPlasmicOrigin() {
-  const params = getHashParams();
-  return ensure(
-    params.get("origin"),
-    "Missing information from Plasmic window."
-  );
+function getPlasmicStaticBaseUrl() {
+  return getHashParams().get("staticBaseUrl") ?? getHashParams().get("origin");
 }
 
 function getStudioHash() {
@@ -46,14 +41,33 @@ function getStudioHash() {
   return urlParams.get("studio-hash");
 }
 
+const STUDIO_SCRIPT_ID = "plasmic-studio-script";
+
 function renderStudioIntoIframe() {
+  if (document.getElementById(STUDIO_SCRIPT_ID)) {
+    return;
+  }
   const script = document.createElement("script");
-  const plasmicOrigin = getPlasmicOrigin();
+  script.id = STUDIO_SCRIPT_ID;
+  const staticBaseUrl = getPlasmicStaticBaseUrl();
   const hash = getStudioHash();
-  script.src = `${plasmicOrigin}/static/js/studio${
-    hash ? `.${hash}.js` : `.js`
-  }`;
+  script.src = `${staticBaseUrl}/js/studio${hash ? `.${hash}.js` : `.js`}`;
   document.body.appendChild(script);
+}
+
+const HIDE_HOST_OVERLAYS_STYLE_ID = "plasmic-hide-host-overlays";
+
+/**
+ * Hide the NextJS dev overlay, rendered as a <nextjs-portal>, when running in an iframe
+ */
+function hideHostOverlaysInStudioIframe() {
+  if (document.getElementById(HIDE_HOST_OVERLAYS_STYLE_ID)) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = HIDE_HOST_OVERLAYS_STYLE_ID;
+  style.textContent = `nextjs-portal { display: none !important; }`;
+  document.head.appendChild(style);
 }
 
 let renderCount = 0;
@@ -105,6 +119,12 @@ function _PlasmicCanvasHost() {
     };
   }, [forceUpdate]);
   React.useEffect(() => {
+    // Hide framework dev overlays when running in Studio
+    if (isFrameAttached && window.parent !== window) {
+      hideHostOverlaysInStudioIframe();
+    }
+  }, [isFrameAttached]);
+  React.useEffect(() => {
     if (shouldRenderStudio && isFrameAttached && window.parent !== window) {
       renderStudioIntoIframe();
     }
@@ -113,7 +133,7 @@ function _PlasmicCanvasHost() {
     if (!shouldRenderStudio && !document.querySelector("#getlibs") && isLive) {
       const scriptElt = document.createElement("script");
       scriptElt.id = "getlibs";
-      scriptElt.src = getPlasmicOrigin() + "/static/js/getlibs.js";
+      scriptElt.src = `${getPlasmicStaticBaseUrl()}/js/getlibs.js`;
       scriptElt.async = false;
       scriptElt.onload = () => {
         (window as any).__GetlibsReadyResolver?.();
@@ -180,39 +200,22 @@ function _PlasmicCanvasHost() {
 
 interface PlasmicCanvasHostProps {
   /**
-   * Webpack hmr uses EventSource to	listen to hot reloads, but that
-   * resultsin a persistent	connection from	each window.  In Plasmic
-   * Studio, if a project is configured to use app-hosting with a
-   * nextjs or gatsby server running in dev mode, each artboard will
-   * be holding a persistent connection to the dev server.
-   * Because browsers	have a limit to	how many connections can
-   * be held	at a time by domain, this means	after X	artboards, new
-   * artboards will freeze and not load.
-   *
-   * By default, <PlasmicCanvasHost /> will globally mutate
-   * window.EventSource to avoid using EventSource for HMR, which you
-   * typically don't need for your custom host page.  If you do still
-   * want to retain HRM, then youc an pass enableWebpackHmr={true}.
+   * @deprecated HMR handling is now managed by Plasmic Studio. This prop is
+   * retained for backward compatibility and has no effect.
    */
   enableWebpackHmr?: boolean;
 }
 
 export const PlasmicCanvasHost: React.FunctionComponent<
   PlasmicCanvasHostProps
-> = (props) => {
-  const { enableWebpackHmr } = props;
+> = () => {
   const [node, setNode] = React.useState<React.ReactElement<any, any> | null>(
     null
   );
   React.useEffect(() => {
     setNode(<_PlasmicCanvasHost />);
   }, []);
-  return (
-    <>
-      {!enableWebpackHmr && <DisableWebpackHmr />}
-      {node}
-    </>
-  );
+  return <>{node}</>;
 };
 
 type RenderErrorListener = (err: Error) => void;
@@ -259,34 +262,6 @@ class ErrorBoundary extends React.Component<
       return <>{this.props.children}</>;
     }
   }
-}
-
-function DisableWebpackHmr() {
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
-  return (
-    <script
-      type="text/javascript"
-      dangerouslySetInnerHTML={{
-        __html: `
-      if (typeof window !== "undefined") {
-        const RealEventSource = window.EventSource;
-        window.EventSource = function(url, config) {
-          if (/[^a-zA-Z]hmr($|[^a-zA-Z])/.test(url)) {
-            console.warn("Plasmic: disabled EventSource request for", url);
-            return {
-              onerror() {}, onmessage() {}, onopen() {}, close() {}
-            };
-          } else {
-            return new RealEventSource(url, config);
-          }
-        }
-      }
-      `,
-      }}
-    ></script>
-  );
 }
 
 function deriveCanvasContextValue(): PlasmicCanvasContextValue | false {

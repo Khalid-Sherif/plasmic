@@ -1,8 +1,10 @@
 import { getComponentContext } from "@/wab/client/commands/context-utils";
 import { Command } from "@/wab/client/commands/types";
-import { mkInitialState } from "@/wab/client/components/sidebar-tabs/StateManagement/VariablesSection";
-import { addComponentState } from "@/wab/shared/core/states";
+import { createComponentState } from "@/wab/client/operations/create-component-state";
+import { ensureOk } from "@/wab/commons/neverthrow-utils";
+import { DEFAULT_STATE_VARIABLE_NAME } from "@/wab/shared/core/states";
 import { Component, State } from "@/wab/shared/model/classes";
+import { ok } from "neverthrow";
 
 export const addNewStateVariableCommand: Command<
   {},
@@ -22,11 +24,16 @@ export const addNewStateVariableCommand: Command<
   },
   context: getComponentContext,
   execute: async (studioCtx, _, { component }) => {
-    return await studioCtx.change(({ success }) => {
-      const newState = mkInitialState(studioCtx, component);
-      addComponentState(studioCtx.site, component, newState);
-
-      return success(newState);
+    return studioCtx.change(() => {
+      const state = ensureOk(
+        createComponentState({
+          site: studioCtx.site,
+          component,
+          tplMgr: studioCtx.tplMgr(),
+          name: DEFAULT_STATE_VARIABLE_NAME,
+        })
+      );
+      return ok(state);
     });
   },
 };

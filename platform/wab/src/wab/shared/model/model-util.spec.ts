@@ -1,7 +1,11 @@
 import { Bundler } from "@/wab/shared/bundler";
 import { Site } from "@/wab/shared/model/classes";
 import { toJson } from "@/wab/shared/model/model-tree-util";
-import { typeFactory, wabToTsType } from "@/wab/shared/model/model-util";
+import {
+  normalizeToChoiceObjects,
+  typeFactory,
+  wabToTsType,
+} from "@/wab/shared/model/model-util";
 import { readFileSync } from "fs";
 
 describe("model-util", () => {
@@ -67,6 +71,53 @@ describe("wabToTsType", () => {
     });
   });
 
+  describe("multiChoice", () => {
+    it("emits an array union for primitive options", () => {
+      expect(
+        wabToTsType(typeFactory.multiChoice(["red", "blue", "green"]))
+      ).toBe(`("red"|"blue"|"green")[]`);
+    });
+
+    it("emits an array union of values for {label, value} options", () => {
+      expect(
+        wabToTsType(
+          typeFactory.multiChoice([
+            { label: "Red", value: "red" },
+            { label: "Blue", value: "blue" },
+            { label: "Green", value: "green" },
+          ])
+        )
+      ).toBe(`("red"|"blue"|"green")[]`);
+    });
+
+    it("handles a mix of primitive and object options", () => {
+      expect(
+        wabToTsType(
+          typeFactory.multiChoice([
+            "red",
+            { label: "Blue", value: "blue" },
+            "green",
+          ] as any)
+        )
+      ).toBe(`("red"|"blue"|"green")[]`);
+    });
+
+    it("supports number-typed values", () => {
+      expect(
+        wabToTsType(
+          typeFactory.multiChoice([
+            { label: "One", value: 1 },
+            { label: "Two", value: 2 },
+          ])
+        )
+      ).toBe(`(1|2)[]`);
+    });
+
+    it("falls back to string[] when there are no options", () => {
+      expect(wabToTsType(typeFactory.multiChoice([]))).toBe("string[]");
+    });
+  });
+
   describe("function types", () => {
     it("emits () => void for a function with no params", () => {
       expect(wabToTsType(typeFactory.func())).toBe("() => void");
@@ -108,6 +159,25 @@ describe("wabToTsType", () => {
       expect(wabToTsType(typeFactory.renderable(), true)).toBe(
         "React.ReactNode"
       );
+    });
+  });
+
+  describe("normalizeToChoiceObjects", () => {
+    it("keeps values raw and stringifies only the label", () => {
+      expect(normalizeToChoiceObjects(["a", 1, true])).toEqual([
+        { value: "a", label: "a" },
+        { value: 1, label: "1" },
+        { value: true, label: "true" },
+      ]);
+    });
+
+    it("passes through {value, label} objects and falls back to value", () => {
+      expect(
+        normalizeToChoiceObjects([{ value: "x", label: "X" }, { value: "y" }])
+      ).toEqual([
+        { value: "x", label: "X" },
+        { value: "y", label: "y" },
+      ]);
     });
   });
 });

@@ -1,4 +1,5 @@
 /** @format */
+
 import { useContextMenu } from "@/wab/client/components/ContextMenu";
 import { PublicLink } from "@/wab/client/components/PublicLink";
 import { usePreviewCtx } from "@/wab/client/components/live/PreviewCtx";
@@ -29,7 +30,6 @@ import {
 import { isAdminTeamEmail } from "@/wab/shared/devflag-utils";
 import { pruneUnusedImageAssets } from "@/wab/shared/prune-site";
 import { APP_ROUTES } from "@/wab/shared/route/app-routes";
-import { fillRoute } from "@/wab/shared/route/route";
 import { naturalSort } from "@/wab/shared/sort";
 import {
   canEditProjectConfig,
@@ -38,6 +38,7 @@ import {
 import { fixPageHrefsToLocal } from "@/wab/shared/utils/split-site-utils";
 import { Menu, Tooltip, notification } from "antd";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 import useSWR from "swr";
 
@@ -190,9 +191,9 @@ function _TopBar({ preview }: TopBarProps) {
                       key="cleanup"
                       onClick={() => {
                         spawn(
-                          studioCtx.change(({ success }) => {
+                          studioCtx.change(() => {
                             studioCtx.tplMgr().cleanRedundantOverrides();
-                            return success();
+                            return ok();
                           })
                         );
                         notification.info({
@@ -208,14 +209,14 @@ function _TopBar({ preview }: TopBarProps) {
                       key="prune-images"
                       onClick={async () => {
                         spawn(
-                          studioCtx.change(({ success }) => {
+                          studioCtx.change(() => {
                             const pruned = pruneUnusedImageAssets(
                               studioCtx.site
                             );
                             notification.success({
                               message: `Pruned ${pruned.size} assets`,
                             });
-                            return success();
+                            return ok();
                           })
                         );
                       }}
@@ -228,7 +229,7 @@ function _TopBar({ preview }: TopBarProps) {
                       key="cleanup-invisible"
                       onClick={async () => {
                         spawn(
-                          studioCtx.change(({ success }) => {
+                          studioCtx.change(() => {
                             const result = studioCtx
                               .tplMgr()
                               .lintElementVisibilities({
@@ -244,7 +245,7 @@ function _TopBar({ preview }: TopBarProps) {
                                 Object.keys(result.changesByComponent).length
                               }`,
                             });
-                            return success();
+                            return ok();
                           })
                         );
                       }}
@@ -367,7 +368,7 @@ function _TopBar({ preview }: TopBarProps) {
             <Tooltip title={brand.logoTooltip ?? "Back to dashboard"}>
               <PublicLink
                 {...props}
-                href={brand.logoHref ?? fillRoute(APP_ROUTES.dashboard, {})}
+                href={brand.logoHref ?? APP_ROUTES.dashboard.fill({})}
               >
                 {brand.logoImgSrc ? (
                   <img src={brand.logoImgSrc} style={{ maxHeight: 40 }} />

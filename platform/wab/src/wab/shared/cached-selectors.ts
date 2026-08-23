@@ -17,10 +17,6 @@ import {
   isBuiltinCodeComponent,
 } from "@/wab/shared/code-components/builtin-code-components";
 import {
-  CustomFunctionId,
-  customFunctionId,
-} from "@/wab/shared/code-components/code-components";
-import {
   getVariantMeta,
   isTplRootWithCodeComponentVariants,
 } from "@/wab/shared/code-components/variants";
@@ -60,6 +56,10 @@ import {
 } from "@/wab/shared/core/image-assets";
 import { ParamExportType } from "@/wab/shared/core/lang";
 import { walkDependencyTree } from "@/wab/shared/core/project-deps";
+import {
+  customFunctionId,
+  type CustomFunctionId,
+} from "@/wab/shared/core/query-ids";
 import {
   allGlobalVariantGroups,
   allGlobalVariants,
@@ -664,6 +664,19 @@ export const customFunctionsAndLibsUsedByComponent = maybeComputedFn(
   }
 );
 
+export const customFunctionsUsedBySite = maybeComputedFn(
+  function customFunctionsUsedBySite(site: Site) {
+    const usedFunctions = new Set<CustomFunction>();
+    for (const component of site.components) {
+      for (const fn of customFunctionsAndLibsUsedByComponent(site, component)
+        .customFunctions) {
+        usedFunctions.add(fn);
+      }
+    }
+    return usedFunctions;
+  }
+);
+
 /**
  * Returns all instances of TplComponent for the argument component
  */
@@ -1060,7 +1073,7 @@ export const siteToUsedDataSources = maybeComputedFn(
 
 interface CCVariantInfo {
   component: Component;
-  /** A code component style variant's selectors, mapped to thier metas. */
+  /** A code component style variant's selectors, mapped to their metas. */
   keysToMetas: Map<string, CodeComponentVariantMeta>;
 }
 

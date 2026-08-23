@@ -20,6 +20,7 @@ import { setupPassport } from "@/wab/server/auth/passport-cfg";
 import * as authRoutes from "@/wab/server/auth/routes";
 import { apiAuth } from "@/wab/server/auth/routes";
 import { doLogout } from "@/wab/server/auth/util";
+import { checkCaptchaToken } from "@/wab/server/captcha";
 import { Config } from "@/wab/server/config";
 import { DbMgr, SUPER_USER } from "@/wab/server/db/DbMgr";
 import { getDevFlagsMergedWithOverrides } from "@/wab/server/db/appconfig";
@@ -29,6 +30,7 @@ import "@/wab/server/extensions";
 import { initAnalyticsFactory, logger } from "@/wab/server/observability";
 import {
   DEFAULT_HISTOGRAM_BUCKETS,
+  METRICS_PATH_ID_MASK,
   WabPromLiveRequestsGauge,
   getTemplatedEndpointFromExpressRoutePath,
   incHttpRequestCount,
@@ -186,7 +188,6 @@ import {
   prefillPublishedLoader,
 } from "@/wab/server/routes/loader";
 import { genTranslatableStrings } from "@/wab/server/routes/localization";
-import * as mailingListRoutes from "@/wab/server/routes/mailinglist";
 import { getAppConfig, getClip, putClip } from "@/wab/server/routes/misc";
 import {
   createProjectWebhook,
@@ -296,6 +297,7 @@ import {
   isApiError,
   transformErrors,
 } from "@/wab/shared/ApiErrors/errors";
+import { CAPTCHA_TOKEN_HEADER } from "@/wab/shared/ApiSchema";
 import { publicCmsReadsContract } from "@/wab/shared/api/cms";
 import { Bundler } from "@/wab/shared/bundler";
 import { mkShortId, safeCast, spawn } from "@/wab/shared/common";
@@ -314,7 +316,6 @@ const csrfFreeStaticRoutes = [
   "/api/v1/admin/clone",
   "/api/v1/admin/deactivate-user",
   "/api/v1/admin/revert-project-revision",
-  "/api/v1/mail/subscribe",
   "/api/v1/plume-pkg/versions",
   "/api/v1/localization/gen-texts",
   "/api/v1/hosting-hit",
@@ -331,6 +332,7 @@ const csrfFreeStaticRoutes = [
 const isCsrfFreeRoute = (pathname: string, config: Config) => {
   return (
     csrfFreeStaticRoutes.includes(pathname) ||
+    pathname.startsWith("/static/js/loader-hydrate") ||
     pathname.includes("/api/v1/clip/") ||
     pathname.includes("/api/v1/code/") ||
     pathname.includes("/api/v1/loader/") ||
@@ -488,7 +490,7 @@ export function addPromMetricsMiddleware(app: express.Application) {
   app.use(
     safeCast<RequestHandler>(async (req: Request, res, next) => {
       // Live requests for all routes after this middleware will be tracked.
-      const liveRequestsGauge = new WabPromLiveRequestsGauge(app.get("name"));
+      const liveRequestsGauge = new WabPromLiveRequestsGauge(name);
       liveRequestsGauge.onReqStart(req);
       // 'close' event is emitted in all HTTP request scenarios
       // https://nodejs.org/api/http.html#httprequesturl-options-callback
@@ -509,20 +511,15 @@ export function addPromMetricsMiddleware(app: express.Application) {
       customLabels: {
         route: null,
         projectId: null,
-        // Also keep track of url for codegen, as the set of
-        // urls codegen uses is reasonably small
-        ...(name === "codegen" && {
-          url: null,
-        }),
       },
       includeMethod: true,
       includeStatusCode: true,
       includePath: true,
+      urlValueParser: {
+        extraMasks: [METRICS_PATH_ID_MASK],
+      },
       transformLabels: (labels, req, _res) => {
         labels.route = req.route?.path;
-        if (name === "codegen") {
-          labels.url = req.originalUrl;
-        }
         Object.assign(labels, req.promLabels ?? {});
       },
       promClient: {
@@ -705,9 +702,6 @@ function addOptionsRoutes(app: express.Application) {
   app.options("/api/v1/app-auth/token", corsPreflight());
   app.options("/api/v1/app-auth/userinfo", corsPreflight());
   app.options("/api/v1/loader/*", corsPreflight());
-  // For mailing list subscriptions
-  // allow subscription requests from anywhere (e.g. localhost or www.plasmic.app)
-  app.options("/api/v1/mail/subscribe", cors());
 }
 
 export function addCmsPublicRoutes(app: express.Application) {
@@ -1198,6 +1192,7 @@ export function addMainAppServerRoutes(
   app.post(
     "/api/v1/auth/sign-up",
     sensitiveRateLimiter,
+    captcha("sign_up"),
     withNext(authRoutes.signUp)
   );
   app.get("/api/v1/auth/self", authRoutes.self);
@@ -1212,6 +1207,7 @@ export function addMainAppServerRoutes(
   app.post(
     "/api/v1/auth/forgotPassword",
     sensitiveRateLimiter,
+    captcha("forgot_password"),
     withNext(authRoutes.forgotPassword)
   );
   app.post(
@@ -1726,12 +1722,6 @@ export function addMainAppServerRoutes(
     withNext(apiTokenRoutes.emitToken)
   );
 
-  app.post(
-    "/api/v1/mail/subscribe",
-    cors(),
-    withNext(mailingListRoutes.subscribe)
-  );
-
   /**
    * Fake data for demos and playwright tests.
    */
@@ -1850,7 +1840,7 @@ export function addMainAppServerRoutes(
    */
   addEndUserManagementRoutes(app, authedSensitiveRateLimiter);
 
-  if (typeof jest === "undefined") {
+  if (typeof vi === "undefined") {
     // Do not create the interval in unit tests, because it keeps running and
     // breaks later tests.
     const checkAndNotifyUpdates = () => {
@@ -1996,6 +1986,21 @@ export async function createApp(
   trackPostgresPool(name);
 
   return { app };
+}
+
+function captcha(expectedAction: string) {
+  return async (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      await checkCaptchaToken({
+        req,
+        captchaToken: req.get(CAPTCHA_TOKEN_HEADER) ?? "",
+        expectedAction,
+      });
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 
 function corsPreflight() {

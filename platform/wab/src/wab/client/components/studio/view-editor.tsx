@@ -27,10 +27,10 @@ import { CommentsDialogs } from "@/wab/client/components/comments/CommentsDialog
 import CommentsTab from "@/wab/client/components/comments/CommentsTab";
 import { CopilotUiPrompt } from "@/wab/client/components/copilot/CopilotUiPrompt";
 import { DevContainer } from "@/wab/client/components/dev";
+import { ComponentPresetsModal } from "@/wab/client/components/insert-panel/ComponentPresetsModal";
 import InsertPanelWrapper from "@/wab/client/components/insert-panel/InsertPanelWrapper";
 import { PreviewCtx } from "@/wab/client/components/live/PreviewCtx";
 import { makeFrameSizeMenu } from "@/wab/client/components/menus/FrameSizeMenu";
-import { OmnibarOverlay } from "@/wab/client/components/omnibar/OmnibarOverlay";
 import {
   ComponentOrPageTab,
   StyleTab,
@@ -48,6 +48,7 @@ import { getContextMenuForFocusedTpl } from "@/wab/client/components/tpl-menu";
 import * as widgets from "@/wab/client/components/widgets";
 import { BrowserAlertBanner } from "@/wab/client/components/widgets/BrowserAlertBanner";
 import { DropdownButton } from "@/wab/client/components/widgets/DropdownButton";
+import { FloatingWindowLayer } from "@/wab/client/components/widgets/FloatingWindow";
 import { AlertBanner } from "@/wab/client/components/widgets/plasmic/AlertBanner";
 import { clientToFramePt, frameToClientPt } from "@/wab/client/coords";
 import {
@@ -115,6 +116,7 @@ import $ from "jquery";
 import { throttle } from "lodash";
 import { observable, runInAction } from "mobx";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React, { createRef } from "react";
 import { createPortal } from "react-dom";
 import ResizeObserver from "resize-observer-polyfill";
@@ -763,9 +765,9 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
           const styleProps =
             await this.viewOps().getPasteStylePropsFromClipboard();
 
-          await this.props.studioCtx.change(({ success }) => {
+          await this.props.studioCtx.change(() => {
             this.viewOps().pasteStyleClip(styleProps);
-            return success();
+            return ok();
           });
         }),
       PASTE_AS_SIBLING: (e: KeyboardEvent) =>
@@ -980,6 +982,11 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
     // Dispatch Plasmic events if the original event happened inside an iframe
     if (isCanvasIframeEvent(e)) {
       this.props.studioCtx.setWatchPlayerId(null);
+      // Mousedown on the canvas frame may not blur a focused top frame element.
+      // Manually focus this window (studio frame) to ensure the top frame focus
+      // is on the studio iframe.
+      window.focus();
+      // Dispatch custom mousedown event for other handlers.
       document.dispatchEvent(new Event(plasmicIFrameMouseDownEvent));
     }
 
@@ -1807,10 +1814,6 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
       ? studioCtx.multiplayerCtx.getPlayerDataById(studioCtx.watchPlayerId)
       : undefined;
 
-    const disableRightPane =
-      !!(DEVFLAGS.richtext2 && this.viewCtx()?.editingTextContext()) ||
-      (this.viewCtx()?.focusedTpls().length ?? 0) > 1;
-
     return (
       <div className="canvas-editor">
         {viewCtx?.autoOpenedUuid && (
@@ -1824,7 +1827,7 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
         {studioCtx.currentArena && (
           <>
             <InsertPanelWrapper />
-            <OmnibarOverlay />
+            <ComponentPresetsModal />
           </>
         )}
         <GlobalCssVariables />
@@ -1894,7 +1897,6 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
                   hexColor={watchedPlayer.color}
                 />
               )}
-              <CommentsDialogs studioCtx={studioCtx} />
               {studioCtx.showUiCopilot ? <CopilotUiPrompt /> : null}
               {studioCtx.showDevControls && (
                 <div className="canvas-editor__top-pane">
@@ -1982,7 +1984,7 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
                 </div>
                 {!studioCtx.focusedMode && <VariantsBar />}
               </div>
-              {DEVFLAGS.richtext2 && this.viewCtx()?.editingTextContext() && (
+              {this.viewCtx()?.editingTextContext() && (
                 <RichTextToolbar
                   ctx={ensure(
                     this.viewCtx()?.editingTextContext(),
@@ -1996,7 +1998,13 @@ class ViewEditor_ extends React.Component<ViewEditorProps, ViewEditorState> {
               <PlayerCursors />
               <FocusedModeToolbar studioCtx={studioCtx} />
             </div>
-            <RightPane studioCtx={studioCtx} disabled={disableRightPane} />
+            <RightPane
+              studioCtx={studioCtx}
+              disabled={(this.viewCtx()?.focusedTpls().length ?? 0) > 1}
+            />
+            <FloatingWindowLayer>
+              <CommentsDialogs studioCtx={studioCtx} />
+            </FloatingWindowLayer>
           </div>
 
           <DevContainer

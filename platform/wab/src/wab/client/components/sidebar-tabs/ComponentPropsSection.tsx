@@ -51,7 +51,7 @@ import {
 } from "@/wab/client/state-management/preview-steps";
 import { StudioCtx, useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { ViewCtx } from "@/wab/client/studio-ctx/view-ctx";
-import { unwrap } from "@/wab/commons/failable-utils";
+import { unwrap } from "@/wab/commons/neverthrow-utils";
 import { VARIABLE_LOWER } from "@/wab/shared/Labels";
 import { TplMgr } from "@/wab/shared/TplMgr";
 import { flattenComponent } from "@/wab/shared/cached-selectors";
@@ -62,7 +62,10 @@ import {
 import { getExportedComponentName } from "@/wab/shared/codegen/react-p/serialize-utils";
 import { paramToVarName } from "@/wab/shared/codegen/util";
 import { assert, ensure, hackyCast, spawn } from "@/wab/shared/common";
-import { getComponentPropTypes } from "@/wab/shared/component-props";
+import {
+  getComponentPropTypes,
+  inferPropTypeFromParam,
+} from "@/wab/shared/component-props";
 import {
   getComponentDisplayName,
   getRealParams,
@@ -115,6 +118,7 @@ import { Dropdown, Input, Menu, Tooltip, notification } from "antd";
 import L, { defer, isArray, sortBy } from "lodash";
 import { autorun } from "mobx";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 
 export type TplComponentPropCtx = {
@@ -125,23 +129,16 @@ export type TplComponentPropCtx = {
 
 function isParamAdvanced(param: Param, ctx: TplComponentPropCtx): boolean {
   const { tpl, viewCtx, expsProvider } = ctx;
-  const propType = viewCtx.canvasCtx
-    .getRegisteredCodeComponentsMap()
-    .get(tpl.component.name)?.meta.props[param.variable.name];
+  const propType = inferPropTypeFromParam(
+    viewCtx.studioCtx,
+    viewCtx,
+    tpl,
+    param
+  );
   const isSet = !!expsProvider
     .effectiveVs()
     .args.find((_arg) => _arg.param === param);
   return !!isAdvancedProp(propType, param) && !isSet;
-}
-
-function hasAdvancedProps(
-  node: PropTreeNode,
-  ctx: TplComponentPropCtx
-): boolean {
-  if (node.kind === "param") {
-    return isParamAdvanced(node.param, ctx);
-  }
-  return node.children.some((child) => hasAdvancedProps(child, ctx));
 }
 
 function hasNonAdvancedProps(
@@ -152,6 +149,16 @@ function hasNonAdvancedProps(
     return !isParamAdvanced(node.param, ctx);
   }
   return node.children.some((child) => hasNonAdvancedProps(child, ctx));
+}
+
+function collectAdvancedParams(
+  node: PropTreeNode,
+  ctx: TplComponentPropCtx
+): Param[] {
+  if (node.kind === "param") {
+    return isParamAdvanced(node.param, ctx) ? [node.param] : [];
+  }
+  return node.children.flatMap((child) => collectAdvancedParams(child, ctx));
 }
 
 function getPropNodeKey(node: PropTreeNode): string | number {
@@ -286,6 +293,9 @@ export const ComponentPropsSection = observer(
     );
 
     const tree = buildPropTree(tpl.component, mainProps);
+    const advancedParams = tree.flatMap((node) =>
+      collectAdvancedParams(node, tplCtx)
+    );
 
     return (
       <>
@@ -298,9 +308,12 @@ export const ComponentPropsSection = observer(
                 tab === "settings" ? "props" : "nested styles"
               }`
             }
-            hasCollapsibleContent={tree.some((node) =>
-              hasAdvancedProps(node, tplCtx)
-            )}
+            hasCollapsibleContent={advancedParams.length > 0}
+            onExtraContentExpanded={() => {
+              if (advancedParams.length > 0) {
+                viewCtx.highlightParams = { tpl, params: advancedParams };
+              }
+            }}
             key={`main.${tpl.uid}`}
           >
             {tab === "settings" && actions.length > 0 && (
@@ -479,7 +492,6 @@ export function VariableEditor(props: {
       )}
       <DataPickerEditor
         viewCtx={viewCtx}
-        flatten={true}
         data={filteredData}
         initialMode={"dataPicking"}
         hideStateSwitch={true}
@@ -693,7 +705,6 @@ export function ExprEditor(props: {
 
   return (
     <DataPickerEditor
-      flatten={true}
       data={data}
       schema={schema}
       initialMode={initialMode}
@@ -1086,9 +1097,9 @@ function TplComponentNameSection_(props: {
       >
         <a
           onClick={() =>
-            studioCtx.change(({ success }) => {
+            studioCtx.change(() => {
               studioCtx.switchToComponentArena(tpl.component);
-              return success();
+              return ok();
             })
           }
         >

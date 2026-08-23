@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/plasmic-sanity-io",
-  "version": "1.0.226",
+  "version": "1.0.239",
   "description": "Plasmic Sanity.io components.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/plasmic-sanity-io"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/index.mjs",
@@ -20,16 +27,16 @@
   ],
   "scripts": {
     "build": "tsup-node src/index.tsx --dts --format esm,cjs --target es2019",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test --passWithNoTests",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
     "prepublishOnly": "npm run build",
     "size": "size-limit",
     "analyze": "size-limit --why"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "@plasmicapp/query": "0.1.84",
-    "@types/dlv": "^1.1.2",
-    "@types/node": "^17.0.14",
+    "@plasmicapp/host": "2.0.17",
+    "@plasmicapp/query": "0.1.87",
+    "@types/dlv": "^1.1.5",
+    "@types/node": "^17.0.45",
     "@types/react": "^18",
     "tslib": "^2.3.1",
     "tsup": "^7.2.0",

@@ -1,5 +1,12 @@
 {
-  "version": "1.0.76",
+  "version": "1.0.82",
+  "description": "Edge-runtime helpers for applying Plasmic A/B tests and content splits in middleware.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "packages/loader-edge"
+  },
   "license": "MIT",
   "types": "./dist/index.d.ts",
   "main": "./dist/index.js",
@@ -15,15 +22,15 @@
     "dist"
   ],
   "engines": {
-    "node": ">=10"
+    "node": ">=18"
   },
   "scripts": {
-    "build": "yarn build:types && yarn build:index",
-    "build:types": "yarn tsc",
+    "build": "pnpm build:types && pnpm build:index",
+    "build:types": "tsc",
     "build:index": "node ../../build.mjs ./src/index.ts",
     "yalcp": "yalc publish --push",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test --passWithNoTests",
-    "coverage": "TEST_CWD=`pwd` yarn --cwd=../.. test --coverage --passWithNoTests",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "lint": "eslint",
     "prepublishOnly": "npm run build",
     "postpublish": "bash ../../scripts/publish-api-doc-model.sh",
@@ -39,10 +46,13 @@
     }
   ],
   "dependencies": {
-    "@plasmicapp/loader-splits": "1.0.70"
+    "@plasmicapp/loader-splits": "1.0.76"
   },
   "devDependencies": {
-    "@plasmicapp/loader-fetcher": "2.0.0"
+    "@plasmicapp/loader-fetcher": "2.0.5",
+    "@vitest/coverage-v8": "4.1.10",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   },
   "publishConfig": {
     "access": "public"

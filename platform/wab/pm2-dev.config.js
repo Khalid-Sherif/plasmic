@@ -3,6 +3,9 @@ const WITH_HOSTING = process.env["PM2_WITH_HOSTING"];
 const WITH_DEDICATED_CODEGEN = process.env["PM2_WITH_DEDICATED_CODEGEN"];
 
 function getCodegenHost() {
+  if (process.env["CODEGEN_HOST"]) {
+    return process.env["CODEGEN_HOST"];
+  }
   return WITH_DEDICATED_CODEGEN
     ? "http://localhost:3008"
     : "http://localhost:3004";
@@ -15,7 +18,7 @@ function getPlasmicHostingApps() {
   return [
     {
       name: "codegen-backend",
-      script: "yarn",
+      script: "pnpm",
       args: ["run-ts", "src/wab/server/codegen-backend.ts"],
       time: true,
       env: {
@@ -61,7 +64,7 @@ module.exports = {
   apps: [
     {
       name: "backend",
-      script: "yarn",
+      script: "pnpm",
       args: ["backend"],
       log_date_format: "HH:mm:ss.SSS",
       env: {
@@ -70,7 +73,7 @@ module.exports = {
           process.env.HOSTSERVER_PORT || "3005"
         }/static/host.html`,
         CODEGEN_HOST: getCodegenHost(),
-        SOCKET_HOST: "http://localhost:3020",
+        SOCKET_HOST: process.env["SOCKET_HOST"] || "http://localhost:3020",
         REACT_APP_PUBLIC_URL: "http://localhost:3003",
         INTEGRATIONS_HOST: "http://localhost:3003",
         DISABLE_BWRAP: "1",
@@ -80,15 +83,28 @@ module.exports = {
     },
     {
       name: "socket-server",
-      script: "yarn",
-      args: ["socket-server"],
+      // pm2 cluster mode must fork a Node script it can require(); it cannot
+      // exec a package-manager CLI (classic yarn's bin happened to be a
+      // require()-able JS file, pnpm's is not, so `script: "pnpm"` crash-loops
+      // here). Point at the TS entry directly with the same preloads
+      // tools/run.bash sets up; process.send("ready") from server-common then
+      // reaches pm2's IPC directly, so wait_ready actually waits for the
+      // server.
+      script: "src/wab/server/app-socket-backend-real.ts",
+      interpreter: "node",
+      node_args: [
+        "--max-old-space-size=2000",
+        "-r",
+        "esbuild-register",
+        "-r",
+        "dotenv/config",
+      ],
       wait_ready: true,
       time: true,
       env: {
         SOCKET_PORT: 3020,
+        NQ_SQLJS: "1",
       },
-      node_args: ["--max-old-space-size=2000"],
-      interpreter: "none",
       exec_mode: "cluster",
       instances: 1,
       merge_logs: true,
@@ -98,7 +114,7 @@ module.exports = {
       : [
           {
             name: "wab-watch-css",
-            script: "yarn",
+            script: "pnpm",
             args: ["watch-css"],
             exec_mode: "fork_mode",
             autorestart: false,
@@ -115,7 +131,7 @@ module.exports = {
           },
           {
             name: "dev-server",
-            script: "yarn",
+            script: "pnpm",
             args: ["start"],
             exec_mode: "fork_mode",
             autorestart: false,
@@ -123,7 +139,7 @@ module.exports = {
           },
           {
             name: "host-server",
-            script: "yarn",
+            script: "pnpm",
             args: ["host-server"],
             exec_mode: "fork_mode",
             autorestart: false,

@@ -318,6 +318,9 @@ export interface ApiWorkspace extends ApiEntityBase {
   contentCreatorConfig: UiConfig | null;
 }
 
+/** Header used to send the captcha token on captcha-protected routes. */
+export const CAPTCHA_TOKEN_HEADER = "x-plasmic-captcha-token";
+
 export interface SignUpRequest {
   email: string;
   password: string;
@@ -503,6 +506,11 @@ export interface ApiProject extends ApiEntityBase {
   extraData: ProjectExtraData | null;
   readableByPublic: boolean;
   isUserStarter?: boolean;
+  /**
+   * Declared as `never` so that any attempt to build `ApiProject` by spreading
+   * `Project` fails to compile.
+   */
+  secretApiToken?: never;
 }
 
 export interface ApiProjectMeta
@@ -541,7 +549,7 @@ export interface CloneProjectRequest {
 }
 
 export interface CloneProjectResponse {
-  projectId: string;
+  projectId: ProjectId;
 }
 
 export interface CreateProjectResponse {
@@ -1179,6 +1187,8 @@ export interface ApiDataSource {
   source: DataSourceType;
   settings: Record<string, any>;
   ownerId?: string;
+  /** Whether the integration has server-side auth data that only the proxy applies. */
+  hasPrivateConfig: boolean;
 }
 
 export interface ApiDataSourceTest {
@@ -1534,6 +1544,7 @@ export type CheckDomainStatus =
       isAnyPlasmicDomain: boolean;
       isCorrectlyConfigured?: boolean;
       configuredBy?: string;
+      configCheckFailed?: boolean;
     };
 
 export interface CheckDomainRequest {
@@ -1651,8 +1662,12 @@ export type SetDomainStatus =
   | "DomainInvalid"
   | "DomainUsedElsewhereInPlasmic"
   | "DomainUsedElsewhereInVercel"
+  | "VercelAuthError"
   | "OtherDomainError"
   | "DomainUpdated";
+
+/** What was being done to a domain when it failed. */
+export type SetDomainOperation = "register" | "remove";
 
 export interface SetSubdomainForProjectRequest {
   subdomain?: string;
@@ -1668,8 +1683,16 @@ export interface SetCustomDomainForProjectRequest {
   projectId: ProjectId;
 }
 
+/** What happened to one domain. */
+export interface SetDomainOutcome {
+  status: SetDomainStatus;
+  vercelErrorCode?: string;
+  operation?: SetDomainOperation;
+}
+
 export interface SetCustomDomainForProjectResponse {
-  status: { [domain: string]: SetDomainStatus };
+  /** Keyed by domain, or by "" when the outcome isn't about a specific domain. */
+  domains: { [domain: string]: SetDomainOutcome };
 }
 export type ApiAnalyticsProjectMeta = {
   pages: Array<{

@@ -2,6 +2,7 @@ import { getComponentStatesContext } from "@/wab/client/commands/context-utils";
 import { Command, stringPrompt } from "@/wab/client/commands/types";
 import { getStateVarName } from "@/wab/shared/core/states";
 import { Expr, State } from "@/wab/shared/model/classes";
+import { ok } from "neverthrow";
 
 export const changeStateInitialValueCommand: Command<
   {
@@ -11,7 +12,7 @@ export const changeStateInitialValueCommand: Command<
     state: State;
   }
 > = {
-  // @ts-expect-error - args.expr type depends on the type of the selected state. Should be fixed in Omnibar UI integration.
+  // @ts-expect-error - args.expr type depends on the type of the selected state. Should be fixed when a command UI is integrated.
   meta: ({ state }) => {
     return {
       id: `component.changeStateInitialValue.${state.uid}`,
@@ -25,9 +26,9 @@ export const changeStateInitialValueCommand: Command<
   },
   context: getComponentStatesContext,
   execute: async (studioCtx, { expr }, { state }) => {
-    return await studioCtx.change(({ success }) => {
-      state.param.defaultExpr = expr;
-      return success();
+    return await studioCtx.change(() => {
+      studioCtx.siteOps().updateState(state, { initialValue: expr ?? null });
+      return ok();
     });
   },
 };

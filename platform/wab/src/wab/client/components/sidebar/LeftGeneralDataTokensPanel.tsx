@@ -1,6 +1,7 @@
 import {
   RenderElementProps,
   VirtualTree,
+  VirtualTreeHandle,
   getFolderKeyChanges,
   useTreeData,
 } from "@/wab/client/components/grouping/VirtualTree";
@@ -19,6 +20,7 @@ import {
 import { Matcher } from "@/wab/client/components/view-common";
 import { PlasmicLeftGeneralDataTokensPanel } from "@/wab/client/plasmic/plasmic_kit_left_pane/PlasmicLeftGeneralDataTokensPanel";
 import { useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import { useModelUiActionHandler } from "@/wab/client/studio-ctx/ui/studio-ui-actions";
 import {
   DataTokenType,
   DataTokenValue,
@@ -56,6 +58,7 @@ import { DataToken, ProjectDependency } from "@/wab/shared/model/classes";
 import { naturalSort } from "@/wab/shared/sort";
 import { debounce, groupBy } from "lodash";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import * as React from "react";
 
 // Data Token Controls Context
@@ -119,6 +122,7 @@ function mapToDataTokenPanelRow({
 const LeftGeneralDataTokensPanel = observer(
   function LeftGeneralDataTokensPanel() {
     const studioCtx = useStudioCtx();
+    const treeRef = React.useRef<VirtualTreeHandle>(null);
     const [debouncedQuery, setDebouncedQuery] = React.useState("");
     const debouncedSetQuery = React.useCallback(
       debounce((value: string) => {
@@ -172,14 +176,14 @@ const LeftGeneralDataTokensPanel = observer(
       async (type: DataTokenType, folderName?: string) => {
         const folderPath = getFolderWithSlash(folderName);
 
-        await studioCtx.change(({ success }) => {
+        await studioCtx.change(() => {
           const token = studioCtx.tplMgr().addDataToken({
             prefix: folderPath,
             value: dataTypes[type].defaultSerializedValue,
           });
           setJustAdded(token);
           setEditToken(new MutableToken(token));
-          return success();
+          return ok();
         });
       },
       [studioCtx, setJustAdded, setEditToken]
@@ -261,11 +265,11 @@ const LeftGeneralDataTokensPanel = observer(
 
     const onDuplicate = React.useCallback(
       async (token: DataToken) => {
-        await studioCtx.change(({ success }) => {
+        await studioCtx.change(() => {
           const newToken = studioCtx.tplMgr().duplicateDataToken(token);
           setJustAdded(newToken);
           setEditToken(new MutableToken(newToken));
-          return success();
+          return ok();
         });
       },
       [studioCtx, setJustAdded, setEditToken]
@@ -324,6 +328,10 @@ const LeftGeneralDataTokensPanel = observer(
               tokenType: category,
               name: studioCtx.projectDependencyManager.getNiceDepName(dep),
               key: `${category}-${dep.uuid}`,
+              // We only include registered tokens if they're from a hostless
+              // package; otherwise, registered tokens from custom host will
+              // already show up in the RegisteredTokens section.
+              // Note we don't currently allow registered DATA tokens.
               ...makeTokensItems(
                 (isHostLessPackage(dep.site)
                   ? finalDataTokensForDep(studioCtx.site, dep.site)
@@ -407,9 +415,10 @@ const LeftGeneralDataTokensPanel = observer(
             const selectedTokens = studioCtx.site.dataTokens.filter((t) =>
               selected.includes(t.uuid)
             );
-            return await studioCtx
+            const result = await studioCtx
               .siteOps()
               .tryDeleteDataTokens(selectedTokens);
+            return result.isOk() && result.value.deletedResources.length > 0;
           }}
         >
           <DataTokenControlsContext.Provider
@@ -422,6 +431,7 @@ const LeftGeneralDataTokensPanel = observer(
             }}
           >
             <VirtualTree
+              ref={treeRef}
               rootNodes={items}
               renderElement={DataTokenTreeRow}
               nodeData={nodeData}
@@ -456,6 +466,7 @@ const LeftGeneralDataTokensPanel = observer(
       nodeKey,
       nodeHeights,
       renameGroup,
+      expandTo,
       expandAll,
       collapseAll,
     } = useTreeData<DataTokenPanelRow>({
@@ -467,6 +478,13 @@ const LeftGeneralDataTokensPanel = observer(
       getNodeSearchText: getRowSearchText,
       getNodeHeight: getRowHeight,
       defaultOpenKeys: "all",
+    });
+
+    // Tokens from imported projects may be virtualized or collapsed,
+    // so listen for UI actions and expand/scroll to it.
+    useModelUiActionHandler("DataToken", (uuid) => {
+      expandTo(uuid);
+      treeRef.current?.scrollTo(uuid);
     });
 
     return (

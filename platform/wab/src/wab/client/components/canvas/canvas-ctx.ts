@@ -40,7 +40,7 @@ import { DEVFLAGS } from "@/wab/shared/devflags";
 import { Box } from "@/wab/shared/geom";
 import { ArenaFrame } from "@/wab/shared/model/classes";
 import { CodeLibraryRegistration } from "@/wab/shared/register-library";
-import { getPublicUrl } from "@/wab/shared/urls";
+import { getStaticBaseUrl } from "@/wab/shared/urls";
 import {
   ComponentRegistration,
   CustomFunctionRegistration,
@@ -255,7 +255,6 @@ export class CanvasCtx {
     const $doc = (this._$doc = $(doc) as JQuery<HTMLDocument>);
 
     this._$html = $doc.find("html");
-    this.setInteractiveMode(sc.isInteractiveMode);
     this._$head = this._$html.find("head");
     this._controlStyleNode = upsertJQSelector(
       "style#controlStyles",
@@ -263,7 +262,7 @@ export class CanvasCtx {
       this._$head
     )[0] as HTMLStyleElement;
     upsertJQSelector(
-      `link[href='${getPublicUrl()}/static/styles/canvas/canvas.${
+      `link[href='${getStaticBaseUrl()}/styles/canvas/canvas.${
         ENV.COMMITHASH
       }.css']`,
       () =>
@@ -271,7 +270,7 @@ export class CanvasCtx {
           $("<link />").attr({
             rel: "stylesheet",
             type: "text/css",
-            href: `${getPublicUrl()}/static/styles/canvas/canvas.${
+            href: `${getStaticBaseUrl()}/styles/canvas/canvas.${
               ENV.COMMITHASH
             }.css`,
             crossOrigin: "anonymous",
@@ -291,8 +290,11 @@ export class CanvasCtx {
     // We also do it earlier so that we can intercept clicks as much as possible, rather than waiting for __wab_user_body first.
     this._$head = this._$html.find("head");
     this._$body = this._$html.find("body").first();
+    // Call after the host renders its user body. Next renders <html> itself, so
+    // mutating its class beforehand is seen as a server/client mismatch.
+    this.setInteractiveMode(sc.isInteractiveMode);
     upsertJQSelector(
-      `link[href='${getPublicUrl()}/static/styles/canvas/canvas.${
+      `link[href='${getStaticBaseUrl()}/styles/canvas/canvas.${
         ENV.COMMITHASH
       }.css']`,
       () =>
@@ -300,7 +302,7 @@ export class CanvasCtx {
           $("<link />").attr({
             rel: "stylesheet",
             type: "text/css",
-            href: `${getPublicUrl()}/static/styles/canvas/canvas.${
+            href: `${getStaticBaseUrl()}/styles/canvas/canvas.${
               ENV.COMMITHASH
             }.css`,
             crossOrigin: "anonymous",
@@ -364,17 +366,17 @@ export class CanvasCtx {
       ? undefined
       : (this._win as any).__PlasmicDataSourcesBundle;
     // Also need to check usePlasmicDataConfig() as usePlasmicInvalidate() and
-    // unstable_usePlasmicQueries() depend on it, and usePlasmicDataConfig() is
+    // usePlasmicQueries() depend on it, and usePlasmicDataConfig() is
     // actually re-exported from @plasmicapp/query, so just because
     // usePlasmicInvalidate() exists doesn't mean usePlasmicDataConfig() exists.
     // That's because data-sources is provided by react-web, but query is provided
-    // by the user's custom host. This also applies to unstable_usePlasmicQueries.
+    // by the user's custom host. This also applies to usePlasmicQueries.
     if (dataSources && typeof dataSources.usePlasmicDataConfig !== "function") {
       dataSources = {
         ...dataSources,
         usePlasmicDataConfig: undefined,
         usePlasmicInvalidate: undefined,
-        unstable_usePlasmicQueries: undefined,
+        usePlasmicQueries: undefined,
       };
     }
 

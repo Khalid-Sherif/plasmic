@@ -34,14 +34,14 @@ import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-impor
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import projectcss from "../PP__plasmickit_left_pane.module.css"; // plasmic-import: aukbrhkegRkQ6KizvhdUPT/projectcss
+import "../PP__plasmickit_left_pane.css"; // plasmic-import: aukbrhkegRkQ6KizvhdUPT/projectcss
 import sty from "./PlasmicAddDrawerItem.module.css"; // plasmic-import: isQPD0RPCw/css
 
-import image49X6ZsC5Ww5 from "../plasmic_kit_design_system/images/image4.svg"; // plasmic-import: 9X6ZsC5ww5/picture
 import AfterSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__AfterSvg"; // plasmic-import: RYZCFr_yc/icon
 import BeforeSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__BeforeSvg"; // plasmic-import: AobbKyfJE/icon
 import ChevronDownSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__ChevronDownSvg"; // plasmic-import: xZrB9_0ir/icon
 import ComponentSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__ComponentSvg"; // plasmic-import: vJVrKlrDD/icon
+import imageYqfhPdeAw from "../plasmic_kit_style_controls/images/image.png"; // plasmic-import: YQFHPdeAw/picture
 
 createPlasmicElementProxy;
 
@@ -60,17 +60,17 @@ export const PlasmicAddDrawerItem__VariantProps = new Array<VariantPropType>(
 );
 
 export type PlasmicAddDrawerItem__ArgsType = {
-  children?: React.ReactNode;
-  icon?: React.ReactNode;
-  actions?: React.ReactNode;
   previewImage?: React.ReactNode;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
 };
 type ArgPropType = keyof PlasmicAddDrawerItem__ArgsType;
 export const PlasmicAddDrawerItem__ArgProps = new Array<ArgPropType>(
-  "children",
+  "previewImage",
   "icon",
-  "actions",
-  "previewImage"
+  "children",
+  "actions"
 );
 
 export type PlasmicAddDrawerItem__OverridesType = {
@@ -80,10 +80,10 @@ export type PlasmicAddDrawerItem__OverridesType = {
 };
 
 export interface DefaultAddDrawerItemProps {
-  children?: React.ReactNode;
-  icon?: React.ReactNode;
-  actions?: React.ReactNode;
   previewImage?: React.ReactNode;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
   isHighlighted?: SingleBooleanChoiceArg<"isHighlighted">;
   showPreviewImage?: SingleBooleanChoiceArg<"showPreviewImage">;
   className?: string;
@@ -125,22 +125,25 @@ function PlasmicAddDrawerItem__RenderFunc(props: {
         path: "isHighlighted",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.isHighlighted,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
+          $props.isHighlighted,
       },
       {
         path: "showPreviewImage",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.showPreviewImage,
       },
     ],
     [$props, $ctx, $refs]
   );
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
     $queries: {},
+    $q: {},
     $refs,
   });
 
@@ -158,10 +161,10 @@ function PlasmicAddDrawerItem__RenderFunc(props: {
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
       className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
+        "all",
+        "root_reset_aukbrhkegRkQ6KizvhdUPT",
+        "plasmic_default_styles",
+        "plasmic_mixins",
         styleTokensClassNames,
         sty.root
       )}
@@ -170,7 +173,7 @@ function PlasmicAddDrawerItem__RenderFunc(props: {
       <div
         data-plasmic-name={"freeBox"}
         data-plasmic-override={overrides.freeBox}
-        className={classNames(projectcss.all, sty.freeBox, {
+        className={classNames("all", sty.freeBox, {
           [sty.freeBoxshowPreviewImage]: hasVariant(
             $state,
             "showPreviewImage",
@@ -190,10 +193,10 @@ function PlasmicAddDrawerItem__RenderFunc(props: {
               displayMinWidth={"0"}
               displayWidth={"100%"}
               src={{
-                src: image49X6ZsC5Ww5,
-                fullWidth: 150,
-                fullHeight: 150,
-                aspectRatio: 1,
+                src: imageYqfhPdeAw,
+                fullWidth: 1500,
+                fullHeight: 1001,
+                aspectRatio: undefined,
               }}
             />
           ),
@@ -210,27 +213,27 @@ function PlasmicAddDrawerItem__RenderFunc(props: {
               <IconButton
                 children2={
                   <ChevronDownSvgIcon
-                    className={classNames(projectcss.all, sty.svg___6O2L)}
+                    className={classNames("all", sty.svg___6O2L)}
                     role={"img"}
                   />
                 }
               >
                 <BeforeSvgIcon
-                  className={classNames(projectcss.all, sty.svg__zc4N)}
+                  className={classNames("all", sty.svg__zc4N)}
                   role={"img"}
                 />
               </IconButton>
               <IconButton
                 children2={
                   <ChevronDownSvgIcon
-                    className={classNames(projectcss.all, sty.svg___286BO)}
+                    className={classNames("all", sty.svg___286BO)}
                     role={"img"}
                   />
                 }
                 className={classNames("__wab_instance", sty.iconButton__ol5Pp)}
               >
                 <AfterSvgIcon
-                  className={classNames(projectcss.all, sty.svg__acGZq)}
+                  className={classNames("all", sty.svg__acGZq)}
                   role={"img"}
                 />
               </IconButton>
@@ -241,7 +244,7 @@ function PlasmicAddDrawerItem__RenderFunc(props: {
         icon={renderPlasmicSlot({
           defaultContents: (
             <ComponentSvgIcon
-              className={classNames(projectcss.all, sty.svg__xaCli)}
+              className={classNames("all", sty.svg__xaCli)}
               role={"img"}
             />
           ),

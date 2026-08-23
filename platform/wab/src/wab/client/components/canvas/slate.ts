@@ -1,3 +1,4 @@
+import { TagName } from "@/wab/shared/html";
 import type { Expr } from "@/wab/shared/model/classes";
 import { CSSProperties } from "react";
 import {
@@ -11,6 +12,7 @@ import {
   Text,
   Transforms,
 } from "slate";
+import type { HistoryEditor } from "slate-history";
 import type { ReactEditor } from "slate-react";
 import type { MakeADT } from "ts-adt/MakeADT";
 
@@ -19,7 +21,7 @@ type ParagraphAttributes = {
 };
 
 type TplTagAttributes = {
-  tag: (typeof tags)[number];
+  tag: TagName;
   children: Descendant[];
   uuid?: string;
   attributes?: Record<string, string>;
@@ -30,12 +32,23 @@ type TplTagExprTextAttributes = TplTagAttributes & {
   html: boolean;
 };
 
+/**
+ * A `@`-mention chip
+ */
+type MentionAttributes = {
+  /** The raw text the mention serializes to between `@<` and `>` */
+  raw: string;
+  /** Always a single empty text node: the element is void. */
+  children: Descendant[];
+};
+
 type CustomElement = MakeADT<
   "type",
   {
     paragraph: ParagraphAttributes;
     TplTag: TplTagAttributes;
     TplTagExprText: TplTagExprTextAttributes;
+    mention: MentionAttributes;
   }
 >;
 type CustomText = { text: string } & CSSProperties;
@@ -44,20 +57,21 @@ export type ParagraphElement = Record<"type", "paragraph"> &
   ParagraphAttributes;
 export type TplTagExprTextElement = Record<"type", "TplTagExprText"> &
   TplTagExprTextAttributes;
+export type MentionElement = Record<"type", "mention"> & MentionAttributes;
 
 declare module "slate" {
   interface CustomTypes {
-    Editor: BaseEditor & ReactEditor;
+    Editor: BaseEditor & ReactEditor & HistoryEditor;
     Element: CustomElement;
     Text: CustomText;
   }
 }
 
 export function mkTplTagElement(
-  tag: (typeof tags)[number],
+  uuid: string,
+  tag: TagName,
   attributes: Record<string, string>,
-  children: Descendant[],
-  uuid?: string
+  children: Descendant[]
 ): Element {
   return {
     type: "TplTag",
@@ -132,185 +146,3 @@ export function marksForToolbar(editor: Editor): Omit<Text, "text"> | null {
   const { text: _text, ...leafMarks } = leaf;
   return leafMarks as Omit<Text, "text">;
 }
-
-export const tags = [
-  // HTML
-  "a",
-  "abbr",
-  "address",
-  "area",
-  "article",
-  "aside",
-  "audio",
-  "b",
-  "base",
-  "bdi",
-  "bdo",
-  "big",
-  "blockquote",
-  "body",
-  "br",
-  "button",
-  "canvas",
-  "caption",
-  "cite",
-  "code",
-  "col",
-  "colgroup",
-  "data",
-  "datalist",
-  "dd",
-  "del",
-  "details",
-  "dfn",
-  "dialog",
-  "div",
-  "dl",
-  "dt",
-  "em",
-  "embed",
-  "fieldset",
-  "figcaption",
-  "figure",
-  "footer",
-  "form",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "head",
-  "header",
-  "hgroup",
-  "hr",
-  "html",
-  "i",
-  "iframe",
-  "img",
-  "input",
-  "ins",
-  "kbd",
-  "keygen",
-  "label",
-  "legend",
-  "li",
-  "link",
-  "main",
-  "map",
-  "mark",
-  "menu",
-  "menuitem",
-  "meta",
-  "meter",
-  "nav",
-  "noindex",
-  "noscript",
-  "object",
-  "ol",
-  "optgroup",
-  "option",
-  "output",
-  "p",
-  "param",
-  "picture",
-  "pre",
-  "progress",
-  "q",
-  "rp",
-  "rt",
-  "ruby",
-  "s",
-  "samp",
-  "slot",
-  "script",
-  "section",
-  "select",
-  "small",
-  "source",
-  "span",
-  "strong",
-  "style",
-  "sub",
-  "summary",
-  "sup",
-  "table",
-  "template",
-  "tbody",
-  "td",
-  "textarea",
-  "tfoot",
-  "th",
-  "thead",
-  "time",
-  "title",
-  "tr",
-  "track",
-  "u",
-  "ul",
-  "var",
-  "video",
-  "wbr",
-  "webview",
-
-  // SVG
-  "svg",
-
-  "animate",
-  "animateMotion",
-  "animateTransform",
-  "circle",
-  "clipPath",
-  "defs",
-  "desc",
-  "ellipse",
-  "feBlend",
-  "feColorMatrix",
-  "feComponentTransfer",
-  "feComposite",
-  "feConvolveMatrix",
-  "feDiffuseLighting",
-  "feDisplacementMap",
-  "feDistantLight",
-  "feDropShadow",
-  "feFlood",
-  "feFuncA",
-  "feFuncB",
-  "feFuncG",
-  "feFuncR",
-  "feGaussianBlur",
-  "feImage",
-  "feMerge",
-  "feMergeNode",
-  "feMorphology",
-  "feOffset",
-  "fePointLight",
-  "feSpecularLighting",
-  "feSpotLight",
-  "feTile",
-  "feTurbulence",
-  "filter",
-  "foreignObject",
-  "g",
-  "image",
-  "line",
-  "linearGradient",
-  "marker",
-  "mask",
-  "metadata",
-  "mpath",
-  "path",
-  "pattern",
-  "polygon",
-  "polyline",
-  "radialGradient",
-  "rect",
-  "stop",
-  "switch",
-  "symbol",
-  "text",
-  "textPath",
-  "tspan",
-  "use",
-  "view",
-] as const;

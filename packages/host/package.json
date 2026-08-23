@@ -1,7 +1,9 @@
 {
   "name": "@plasmicapp/host",
-  "version": "2.0.4",
+  "version": "2.0.17",
   "description": "plasmic library for app hosting",
+  "homepage": "https://www.plasmic.app",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/plasmicapp/plasmic.git",
@@ -49,7 +51,7 @@
     "analyze": "size-limit --why"
   },
   "dependencies": {
-    "@plasmicapp/query": "0.1.84",
+    "@plasmicapp/query": "0.1.87",
     "csstype": "^3.1.2",
     "window-or-global": "^1.0.1"
   },
@@ -59,16 +61,18 @@
     "@rollup/plugin-node-resolve": "^15.1.0",
     "@testing-library/react": "^14.0.0",
     "@types/classnames": "^2.3.4",
-    "@types/node": "^20.3.3",
+    "@types/node": "^20.19.43",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "jsdom": "28.1.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "rollup": "^3.26.1",
     "rollup-plugin-banner2": "^1.3.1",
     "rollup-plugin-dts": "^5.3.0",
-    "rollup-plugin-typescript2": "^0.36.0",
-    "vitest": "3.2.4"
+    "rollup-plugin-typescript2": "^0.37.0",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

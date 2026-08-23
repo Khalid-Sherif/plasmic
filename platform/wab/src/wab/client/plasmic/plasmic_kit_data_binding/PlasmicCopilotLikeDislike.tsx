@@ -30,11 +30,11 @@ import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-impor
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import projectcss from "./plasmic_plasmic_kit_data_binding.module.css"; // plasmic-import: w2GXN278dkQ2gQTVQnPehW/projectcss
+import "./plasmic_plasmic_kit_data_binding.css"; // plasmic-import: w2GXN278dkQ2gQTVQnPehW/projectcss
 import sty from "./PlasmicCopilotLikeDislike.module.css"; // plasmic-import: -LDNJojbDZD/css
 
-import Icon4Icon from "./icons/PlasmicIcon__Icon4"; // plasmic-import: ZTW8iKylgI/icon
-import Icon5Icon from "./icons/PlasmicIcon__Icon5"; // plasmic-import: mPucsZbX6V/icon
+import ThumbsDownIcon from "./icons/PlasmicIcon__ThumbsDown"; // plasmic-import: mPucsZbX6V/icon
+import ThumbsUpIcon from "./icons/PlasmicIcon__ThumbsUp"; // plasmic-import: ZTW8iKylgI/icon
 
 createPlasmicElementProxy;
 
@@ -104,6 +104,7 @@ function PlasmicCopilotLikeDislike__RenderFunc(props: {
     ],
     [$props, $ctx, $refs]
   );
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
@@ -121,10 +122,10 @@ function PlasmicCopilotLikeDislike__RenderFunc(props: {
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
       className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
+        "all",
+        "root_reset_w2GXN278dkQ2gQTVQnPehW",
+        "plasmic_default_styles",
+        "plasmic_mixins",
         styleTokensClassNames,
         sty.root,
         { [sty.rootstate_dislike]: hasVariant($state, "state", "dislike") }
@@ -140,8 +141,8 @@ function PlasmicCopilotLikeDislike__RenderFunc(props: {
         disabled={hasVariant($state, "state", "dislike") ? true : undefined}
         size={"small"}
       >
-        <Icon4Icon
-          className={classNames(projectcss.all, sty.svg__tYoHl, {
+        <ThumbsUpIcon
+          className={classNames("all", sty.svg__tYoHl, {
             [sty.svgstate_dislike__tYoHl5IumH]: hasVariant(
               $state,
               "state",
@@ -162,8 +163,8 @@ function PlasmicCopilotLikeDislike__RenderFunc(props: {
         disabled={hasVariant($state, "state", "like") ? true : undefined}
         size={"small"}
       >
-        <Icon5Icon
-          className={classNames(projectcss.all, sty.svg__uQuhx, {
+        <ThumbsDownIcon
+          className={classNames("all", sty.svg__uQuhx, {
             [sty.svgstate_dislike__uQuhx5IumH]: hasVariant(
               $state,
               "state",

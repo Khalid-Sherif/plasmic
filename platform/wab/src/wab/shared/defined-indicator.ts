@@ -1,5 +1,6 @@
 import { VariantCombo } from "@/wab/shared/Variants";
 import { arrayEqIgnoreOrder, ensure } from "@/wab/shared/common";
+import { ThemableTag } from "@/wab/shared/html";
 import {
   Animation,
   Arg,
@@ -120,12 +121,13 @@ export interface SlotSource {
 }
 
 export type DefinedIndicatorType =
-  // Used for frame settings or Mixin settings, which is not bound to variants at all.
+  // Prop/value set outside the variant system, such as:
+  // frame settings, mixin settings, query params
   | {
       source: "setNonVariable";
       prop: string;
       value: string;
-      isDefaultTheme?: boolean;
+      themeTag?: ThemableTag;
     }
   | {
       // Value set in the current target variant is the highest priority

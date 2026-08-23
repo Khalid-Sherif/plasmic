@@ -1,185 +1,264 @@
 import { derefTokenRefs, isTokenRef } from "@/wab/commons/StyleToken";
 import { isPageComponent } from "@/wab/shared/core/components";
-import { siteFinalStyleTokensAllDeps } from "@/wab/shared/core/site-style-tokens";
-import { allAnimationSequences } from "@/wab/shared/core/sites";
+import {
+  siteFinalStyleTokensAllDeps,
+  siteFinalStyleTokensDirectDeps,
+} from "@/wab/shared/core/site-style-tokens";
+import { allGlobalVariantGroups } from "@/wab/shared/core/sites";
 import { generateKeyframesRule } from "@/wab/shared/core/styles";
-import { FinalToken } from "@/wab/shared/core/tokens";
+import { FinalToken, toFinalToken } from "@/wab/shared/core/tokens";
 import { parseScreenSpec } from "@/wab/shared/css-size";
 import {
   AnimationSequence,
+  Component,
   Site,
   StyleToken,
+  StyleTokenOverride,
 } from "@/wab/shared/model/classes";
 import {
-  XmlAttrs,
-  XmlObject,
-  indentXmlTextBlock,
-  toXml,
-} from "@/wab/shared/web-exporter/xml-utils";
+  type AnimationJson,
+  type AnimationSummaryJson,
+  type ComponentSummaryJson,
+  type DataQueryFunctionsJson,
+  type GlobalVariantGroupJson,
+  type ProjectJson,
+  type ScreenBreakpointJson,
+  type TokenJson,
+  type TokenValuesJson,
+  type VariantedValueJson,
+} from "@/wab/shared/web-exporter/schema";
 
 /**
- * Serialize project-level information to XML based on the requested filters.
+ * Build the canonical JSON model for project-level information. Produces a
+ * flattened view: each requested key lists the project's own resources plus
+ * those of every imported (direct dependency) project; imported resources carry
+ * a `fromProject` id.
  *
- * @param site - The Site model.
- * @param opts - Boolean filters for which sections to include.
+ * `customFunctions` is pre-built by the caller, since it requires StudioCtx.
  */
-export function serializeProject(
+export function buildProjectResource(
   site: Site,
+  customFunctions: DataQueryFunctionsJson | undefined,
   opts: {
+    projectId: string;
     components?: boolean;
     screenBreakpoints?: boolean;
     globalVariants?: boolean;
     tokens?: boolean;
     animations?: boolean;
   }
-): string {
-  const projectChildren: XmlObject[] = [];
-
+): ProjectJson {
+  let components: ComponentSummaryJson[] | undefined;
   if (opts.components) {
-    const components = site.components.map((comp) => {
-      const attrs: XmlAttrs = {
+    const toComponentSummary = (
+      comp: Component,
+      fromProject?: string
+    ): ComponentSummaryJson => {
+      const path =
+        isPageComponent(comp) && comp.pageMeta.path
+          ? comp.pageMeta.path
+          : undefined;
+      return {
+        __type: "Component",
         name: comp.name,
         uuid: comp.uuid,
         type: comp.type,
+        ...(path ? { pageMeta: { __type: "PageMeta", path } } : {}),
+        ...(fromProject ? { fromProject } : {}),
       };
-      if (isPageComponent(comp) && comp.pageMeta.path) {
-        attrs.path = comp.pageMeta.path;
-      }
-      return { component: { _attr: attrs } };
-    });
-    projectChildren.push({ components });
+    };
+    components = [
+      ...site.components.map((comp) => toComponentSummary(comp)),
+      ...site.projectDependencies.flatMap((dep) =>
+        dep.site.components.map((comp) =>
+          toComponentSummary(comp, dep.projectId)
+        )
+      ),
+    ];
   }
 
-  if (opts.screenBreakpoints) {
-    const screenGroup = site.activeScreenVariantGroup;
-    if (screenGroup) {
-      const breakpointElements = screenGroup.variants.map((variant) => {
-        const attrs: XmlAttrs = {
+  let screenBreakpoints: ScreenBreakpointJson[] | undefined;
+  const screenGroup = site.activeScreenVariantGroup;
+  if (opts.screenBreakpoints && screenGroup) {
+    screenBreakpoints = screenGroup.variants.map((variant) => {
+      const breakpoint: ScreenBreakpointJson = {
+        __type: "ScreenBreakpoint",
+        name: variant.name,
+        uuid: variant.uuid,
+      };
+      if (variant.mediaQuery) {
+        const spec = parseScreenSpec(variant.mediaQuery);
+        if (spec.minWidth) {
+          breakpoint.minWidth = spec.minWidth;
+        }
+        if (spec.maxWidth) {
+          breakpoint.maxWidth = spec.maxWidth;
+        }
+      }
+      return breakpoint;
+    });
+  }
+
+  let globalVariantGroups: GlobalVariantGroupJson[] | undefined;
+  if (opts.globalVariants) {
+    const groupToDepProjectId = new Map(
+      site.projectDependencies.flatMap((dep) =>
+        dep.site.globalVariantGroups.map(
+          (group) => [group, dep.projectId] as const
+        )
+      )
+    );
+    globalVariantGroups = allGlobalVariantGroups(site, {
+      includeDeps: "direct",
+      excludeInactiveScreenVariants: true,
+    }).map((group): GlobalVariantGroupJson => {
+      const fromProject = groupToDepProjectId.get(group);
+      return {
+        __type: "GlobalVariantGroup",
+        name: group.param.variable.name,
+        uuid: group.uuid,
+        ...(fromProject ? { fromProject } : {}),
+        variants: group.variants.map((variant) => ({
+          __type: "Variant",
           name: variant.name,
           uuid: variant.uuid,
-        };
-        if (variant.mediaQuery) {
-          const spec = parseScreenSpec(variant.mediaQuery);
-          if (spec.minWidth) {
-            attrs.minWidth = String(spec.minWidth);
-          }
-          if (spec.maxWidth) {
-            attrs.maxWidth = String(spec.maxWidth);
-          }
-        }
-        return { screenBreakpoint: { _attr: attrs } };
-      });
-      projectChildren.push({ screenBreakpoints: breakpointElements });
-    }
-  }
-
-  if (opts.globalVariants) {
-    const groupElements = site.globalVariantGroups.map((group) => {
-      const variants = group.variants.map((variant) => ({
-        variant: { _attr: { name: variant.name, uuid: variant.uuid } },
-      }));
-      return {
-        group: [
-          { _attr: { name: group.param.variable.name, uuid: group.uuid } },
-          ...variants,
-        ],
+        })),
       };
     });
-    projectChildren.push({ globalVariantGroups: groupElements });
   }
 
+  let tokens: TokenJson[] | undefined;
   if (opts.tokens) {
     const allFinalTokens = siteFinalStyleTokensAllDeps(site);
-    const tokenElements = site.styleTokens.map((token) => ({
-      token: buildTokenXmlBody(token, allFinalTokens),
-    }));
-    projectChildren.push({ tokens: tokenElements });
+    const tokenToDepProjectId = new Map(
+      site.projectDependencies.flatMap((dep) =>
+        dep.site.styleTokens.map((token) => [token, dep.projectId] as const)
+      )
+    );
+    tokens = siteFinalStyleTokensDirectDeps(site).map((finalToken) =>
+      buildTokenModel(finalToken.base, allFinalTokens, {
+        override: finalToken.override,
+        fromProject: tokenToDepProjectId.get(finalToken.base),
+      })
+    );
   }
 
+  let animations: AnimationSummaryJson[] | undefined;
   if (opts.animations) {
-    const sequences = allAnimationSequences(site, { includeDeps: "direct" });
-    const animationElements = sequences.map((sequence) => ({
-      animation: { _attr: { name: sequence.name, uuid: sequence.uuid } },
-    }));
-    projectChildren.push({ animations: animationElements });
+    const toAnimationSummary = (
+      sequence: AnimationSequence,
+      fromProject?: string
+    ): AnimationSummaryJson => ({
+      __type: "Animation",
+      name: sequence.name,
+      uuid: sequence.uuid,
+      ...(fromProject ? { fromProject } : {}),
+    });
+    animations = [
+      ...site.animationSequences.map((seq) => toAnimationSummary(seq)),
+      ...site.projectDependencies.flatMap((dep) =>
+        dep.site.animationSequences.map((seq) =>
+          toAnimationSummary(seq, dep.projectId)
+        )
+      ),
+    ];
   }
 
-  return toXml({ project: projectChildren });
+  return {
+    __type: "Project",
+    id: opts.projectId,
+    ...(components ? { components } : {}),
+    ...(screenBreakpoints ? { screenBreakpoints } : {}),
+    ...(globalVariantGroups ? { globalVariantGroups } : {}),
+    ...(tokens ? { tokens } : {}),
+    ...(animations ? { animations } : {}),
+    ...(customFunctions ? { dataQueryFunctions: customFunctions } : {}),
+    importedProjects: site.projectDependencies.map((dep) => ({
+      __type: "ImportedProject",
+      id: dep.projectId,
+      name: dep.name,
+    })),
+  };
 }
 
-/**
- * Serialize a single style token to XML.
- * If the token references another token, adds a resolvedValue attribute.
- * Each entry in `variantedValues` becomes a `<varianted-value>` child element.
- */
-export function serializeToken(
+/** Build the canonical JSON model for a single style token. */
+export function buildTokenResource(
   token: StyleToken,
   opts: { site: Site }
-): string {
+): TokenJson {
   const allFinalTokens = siteFinalStyleTokensAllDeps(opts.site);
-  return toXml({ token: buildTokenXmlBody(token, allFinalTokens) });
+  const override = toFinalToken(token, opts.site).override;
+  return buildTokenModel(token, allFinalTokens, { override });
 }
 
-function buildTokenXmlBody(
+function buildTokenModel(
   token: StyleToken,
-  allFinalTokens: ReadonlyArray<FinalToken<StyleToken>>
-): XmlObject[] | { _attr: XmlAttrs } {
-  const attrs: XmlAttrs = {
+  allFinalTokens: ReadonlyArray<FinalToken<StyleToken>>,
+  opts: { override?: StyleTokenOverride | null; fromProject?: string } = {}
+): TokenJson {
+  return {
+    __type: "Token",
     name: token.name,
     uuid: token.uuid,
     type: token.type,
-    value: token.value,
+    ...(opts.fromProject ? { fromProject: opts.fromProject } : {}),
+    value: buildTokenValuesModel(token, allFinalTokens),
+    ...(opts.override
+      ? {
+          override: {
+            __type: "TokenOverride" as const,
+            value: buildTokenValuesModel(opts.override, allFinalTokens),
+          },
+        }
+      : {}),
   };
-  if (isTokenRef(token.value)) {
-    attrs.resolvedValue = derefTokenRefs(allFinalTokens, token.value);
-  }
+}
+
+function buildTokenValuesModel(
+  source: StyleToken | StyleTokenOverride,
+  allFinalTokens: ReadonlyArray<FinalToken<StyleToken>>
+): TokenValuesJson {
+  const resolvedValue =
+    source.value != null && isTokenRef(source.value)
+      ? derefTokenRefs(allFinalTokens, source.value)
+      : undefined;
+  const variantedValues = buildVariantedValuesModel(source, allFinalTokens);
+  return {
+    __type: "TokenValues",
+    ...(source.value != null ? { value: source.value } : {}),
+    ...(resolvedValue != null ? { resolvedValue } : {}),
+    ...(variantedValues ? { variantedValues } : {}),
+  };
+}
+
+function buildVariantedValuesModel(
+  token: StyleToken | StyleTokenOverride,
+  allFinalTokens: ReadonlyArray<FinalToken<StyleToken>>
+): VariantedValueJson[] | undefined {
   if (token.variantedValues.length === 0) {
-    return { _attr: attrs };
+    return undefined;
   }
-  const children: XmlObject[] = [{ _attr: attrs }];
-  for (const vv of token.variantedValues) {
-    const vvAttrs: XmlAttrs = {
-      variantUuids: vv.variants.map((v) => v.uuid).join(","),
+  return token.variantedValues.map((vv) => {
+    const value: VariantedValueJson = {
+      __type: "VariantedValue",
+      variantUuids: vv.variants.map((v) => v.uuid),
       value: vv.value,
     };
     if (isTokenRef(vv.value)) {
-      vvAttrs.resolvedValue = derefTokenRefs(allFinalTokens, vv.value);
+      value.resolvedValue = derefTokenRefs(allFinalTokens, vv.value);
     }
-    children.push({ "varianted-value": { _attr: vvAttrs } });
-  }
-  return children;
-}
-
-/**
- * Serialize a single animation sequence to XML with its full @keyframes
- * rule as text content.
- */
-export function serializeAnimationSequence(
-  sequence: AnimationSequence
-): string {
-  return toXml({
-    animation: [
-      { _attr: { name: sequence.name, uuid: sequence.uuid } },
-      indentXmlTextBlock(generateKeyframesRule(sequence), 0),
-    ],
+    return value;
   });
 }
 
-/**
- * Serialize an invalid/missing resource reference to XML.
- */
-export function serializeInvalidResource(
-  uuid: string,
-  type:
-    | "component"
-    | "token"
-    | "tpl"
-    | "globalVariant"
-    | "variantGroup"
-    | "variant"
-    | "variantedValue"
-    | "animation",
-  message: string
-): string {
-  return toXml({ "invalid-resource": [{ _attr: { uuid, type } }, message] });
+/** Build the canonical JSON model for an animation sequence. */
+export function buildAnimationResource(
+  sequence: AnimationSequence
+): AnimationJson {
+  return {
+    __type: "Animation",
+    name: sequence.name,
+    uuid: sequence.uuid,
+    keyframesRule: generateKeyframesRule(sequence),
+  };
 }

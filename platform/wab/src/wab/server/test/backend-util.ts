@@ -1,7 +1,7 @@
 import { runAppServer } from "@/wab/server/app-backend-real";
-import { ensureDbConnection } from "@/wab/server/db/DbCon";
+import { closeDbConnections, ensureDbConnection } from "@/wab/server/db/DbCon";
 import { initDb } from "@/wab/server/db/DbInitUtil";
-import { DbMgr, normalActor, SUPER_USER } from "@/wab/server/db/DbMgr";
+import { DbMgr, SUPER_USER, normalActor } from "@/wab/server/db/DbMgr";
 import { Project, User } from "@/wab/server/entities/Entities";
 import { ensure, range } from "@/wab/shared/common";
 import getPort from "get-port";
@@ -82,12 +82,15 @@ export async function getTeamAndWorkspace(db1: DbMgr) {
 
 /**
  * In CI, creates DB with random name and drops DB in cleanup.
- * In non-CI, creates DB with wab_dev_<name> and doesn't drop in cleanup,
- * allowing you to inspect the database after the test.
+ * In non-CI, creates DB with wab_dev_<name><worker> and doesn't drop in
+ * cleanup, allowing you to inspect the database after the test. The worker
+ * suffix keeps test files running in parallel off each other's database.
  */
 export async function createDatabase(name = "test") {
   const isCI = !!process.env.CI;
-  const dbname = isCI ? dbNameGen(name) : `wab_dev_${name}`;
+  const dbname = isCI
+    ? dbNameGen(name)
+    : `wab_dev_${name}${process.env.VITEST_POOL_ID ?? ""}`;
   const sucon = await ensureDbConnection(
     "postgresql://superwab@localhost/postgres",
     "super"
@@ -95,7 +98,15 @@ export async function createDatabase(name = "test") {
   await sucon.query("select 1");
   await sucon.query(`drop database if exists ${dbname} with (force);`);
   await sucon.query(`create database ${dbname} owner wab;`);
-  await sucon.query(`grant pg_signal_backend to wab;`);
+  // pg_auth_members is a cluster-wide catalog, so parallel workers issuing this
+  // same grant race on its unique index. Losing the race means it's granted.
+  try {
+    await sucon.query(`grant pg_signal_backend to wab;`);
+  } catch (e) {
+    if (e.code !== "23505") {
+      throw e;
+    }
+  }
   const dburi = `postgresql://wab@localhost/${dbname}`;
   const con = await ensureDbConnection(dburi, dbname);
   await con.synchronize();
@@ -154,7 +165,21 @@ export async function createBackend(
 
       return {
         host: `http://localhost:${port}`,
-        cleanup: async () => server.close(),
+        cleanup: async () => {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              server.close((err) => {
+                if (err) {
+                  reject(err);
+                } else {
+                  resolve();
+                }
+              });
+            });
+          } finally {
+            await closeDbConnections();
+          }
+        },
       };
     }
   );

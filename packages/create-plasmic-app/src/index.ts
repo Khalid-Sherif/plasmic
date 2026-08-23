@@ -10,6 +10,7 @@ import { ensure } from "./utils/lang-utils";
 import { checkEngineStrict, updateNotify } from "./utils/npm-utils";
 import {
   JsOrTs,
+  PackageManagerType,
   PlatformOptions,
   PlatformType,
   SchemeType,
@@ -61,8 +62,12 @@ const argv = yargs
     boolean: true,
   })
   .option("appDir", {
-    describe: "(Next.js) Use app directory (experimental)?",
+    describe: "(Next.js) Use app directory?",
     boolean: true,
+  })
+  .option("packageManager", {
+    describe: "Package manager to scaffold and install with",
+    choices: ["", "npm", "yarn", "pnpm"],
   })
   .strict()
   .help("h")
@@ -212,8 +217,7 @@ async function run(): Promise<void> {
 
   const platformOptions: PlatformOptions = {};
   if (platform === "nextjs") {
-    // TODO: re-enable when app dir is released
-    const showAppDirQuestion = false;
+    const showAppDirQuestion = true;
     if (showAppDirQuestion) {
       platformOptions.nextjs = {
         appDir: await maybePrompt({
@@ -257,6 +261,9 @@ What is the URL of your project?`,
 
   const template = argv["template"];
   const projectApiToken = argv["projectApiToken"];
+  const packageManager = (argv["packageManager"] || undefined) as
+    | PackageManagerType
+    | undefined;
 
   // Set the metadata environment variable to tag the future Segment codegen event
   setMetadataEnv({
@@ -271,6 +278,7 @@ What is the URL of your project?`,
     jsOrTs,
     projectApiToken,
     template,
+    packageManager,
   });
 }
 

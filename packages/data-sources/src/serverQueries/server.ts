@@ -6,13 +6,13 @@ import {
   StatefulQueryResult,
 } from "./common";
 import {
-  QueryExecutionContext as CommonQueryExecutionContext,
   ExecutePlasmicQueriesResult,
   PlasmicQuery,
   PlasmicQueryResult,
   QueryCodeComponentNode,
   QueryComponentNode,
   QueryDataProviderNode,
+  QueryExecutionContext,
   QueryNode,
   QueryRepeatedNode,
   QueryVisibilityNode,
@@ -22,7 +22,7 @@ import {
  * Server-side QueryExecutionContext has an extra $scopedItemVars
  * for nested component/element context.
  */
-type QueryExecutionContext = CommonQueryExecutionContext & {
+type ServerQueryExecutionContext = QueryExecutionContext & {
   $scopedItemVars: Record<string, unknown>;
 };
 
@@ -30,15 +30,15 @@ type QueryExecutionContext = CommonQueryExecutionContext & {
  * Initial context just before execution.
  * @internal
  */
-type QueryExecutionInitialContext = Pick<
-  CommonQueryExecutionContext,
+type InitialQueryExecutionContext = Pick<
+  QueryExecutionContext,
   "$ctx" | "$props"
 >;
 
 interface DiscoveredQuery {
   $query: StatefulQueryResult;
   query: PlasmicQuery;
-  ctx: QueryExecutionContext;
+  ctx: ServerQueryExecutionContext;
 }
 
 const ROOT_COMPONENT_KEY_PATH = "root";
@@ -49,12 +49,12 @@ function appendKeyPath(currentKeyPath: string, currentInput: string): string {
 
 function executeQueryTree(
   rootNode: QueryComponentNode,
-  options: QueryExecutionInitialContext,
+  env: InitialQueryExecutionContext,
   queriesByComponent: Map<string, Record<string, StatefulQueryResult>>
 ): DiscoveredQuery[] {
-  const { $props, $ctx } = options;
+  const { $props, $ctx } = env;
 
-  const initialContext: QueryExecutionContext = {
+  const initialContext: ServerQueryExecutionContext = {
     $props,
     $ctx,
     // Placeholder; executeComponentNode replaces this with an initial
@@ -73,7 +73,7 @@ function executeQueryTree(
 }
 
 interface ExecuteNodeParams {
-  context: QueryExecutionContext;
+  context: ServerQueryExecutionContext;
   parentKeyPath: string;
   childIndex: number;
   queriesByComponent: Map<string, Record<string, StatefulQueryResult>>;
@@ -147,7 +147,7 @@ function executeComponentNode(
 
   // Each component owns its own $state derived from node.stateSpecs. Parent-scope state
   // does not leak into this component's $state.
-  const $state: QueryExecutionContext["$state"] =
+  const $state: ServerQueryExecutionContext["$state"] =
     node.stateSpecs.length > 0
       ? createInitial$State(
           parentContext.$ctx,
@@ -157,7 +157,7 @@ function executeComponentNode(
         )
       : {};
 
-  const componentContext: QueryExecutionContext = {
+  const componentContext: ServerQueryExecutionContext = {
     $props: evaluatedProps,
     $ctx: parentContext.$ctx,
     $state,
@@ -196,7 +196,7 @@ function executeCodeComponentNode(
   node: QueryCodeComponentNode,
   params: ExecuteNodeParams
 ): DiscoveredQuery[] {
-  if (node.serverRenderingConfig === false) {
+  if (node.subtreePrefetchingConfig === false) {
     return [];
   }
 
@@ -213,7 +213,7 @@ function executeCodeComponentNode(
     }
   }
 
-  const childContext: QueryExecutionContext = {
+  const childContext: ServerQueryExecutionContext = {
     $props: evaluatedProps,
     $ctx: context.$ctx,
     $state: context.$state,
@@ -243,7 +243,7 @@ function executeDataProviderNode(
     return [];
   }
 
-  const childContext: QueryExecutionContext = {
+  const childContext: ServerQueryExecutionContext = {
     $props: context.$props,
     $ctx: {
       ...context.$ctx,
@@ -297,7 +297,7 @@ function executeRepeatedNode(
   }
 
   return collectionResult.data.flatMap((item, index) => {
-    const itemContext: QueryExecutionContext = {
+    const itemContext: ServerQueryExecutionContext = {
       $props: context.$props,
       $ctx: context.$ctx,
       $state: context.$state,
@@ -332,7 +332,7 @@ function executeRepeatedNode(
  */
 export async function executePlasmicQueries(
   rootNode: QueryComponentNode,
-  options: QueryExecutionInitialContext
+  env: InitialQueryExecutionContext
 ): Promise<ExecutePlasmicQueriesResult> {
   const queriesByComponent = new Map<
     string,
@@ -342,7 +342,7 @@ export async function executePlasmicQueries(
   const discoveredQueries: DiscoveredQuery[] = [];
 
   while (true) {
-    const newQueries = executeQueryTree(rootNode, options, queriesByComponent);
+    const newQueries = executeQueryTree(rootNode, env, queriesByComponent);
 
     if (newQueries.length === 0) {
       break;
@@ -394,7 +394,7 @@ export async function executePlasmicQuery<
 >(
   $query: StatefulQueryResult<T>,
   query: PlasmicQuery<F>,
-  ctx: QueryExecutionContext
+  ctx: ServerQueryExecutionContext
 ): Promise<PlasmicQueryResult<T> & { current: { state: "done" } }> {
   if ($query.current.state === "loading" || $query.current.state === "done") {
     return $query.getDoneResult();

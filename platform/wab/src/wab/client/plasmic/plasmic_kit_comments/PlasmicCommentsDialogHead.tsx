@@ -19,22 +19,20 @@ import {
   deriveRenderOpts,
   Flex as Flex__,
   hasVariant,
-  PlasmicIcon as PlasmicIcon__,
   SingleBooleanChoiceArg,
   StrictProps,
   useDollarState,
 } from "@plasmicapp/react-web";
 import { useDataEnv } from "@plasmicapp/react-web/lib/host";
 
-import { CommentsHeader } from "../../components/comments/CommentsHeader"; // plasmic-import: PTsdlYdahZ76/component
 import { ThreadHistoryStatus } from "../../components/comments/ThreadHistoryStatus"; // plasmic-import: E0P_lFzVr70L/component
-import ListSectionSeparator from "../../components/ListSectionSeparator"; // plasmic-import: uG5_fPM0sK/component
+import DialogHeader from "../../components/widgets/DialogHeader"; // plasmic-import: 5TapYEMkYCfR/component
 import IconButton from "../../components/widgets/IconButton"; // plasmic-import: LPry-TF4j22a/component
 import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-import: BP7V3EkXPURJVwwMyWoHn/styleTokensProvider
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import projectcss from "./plasmic_plasmic_kit_comments.module.css"; // plasmic-import: BP7V3EkXPURJVwwMyWoHn/projectcss
+import "./plasmic_plasmic_kit_comments.css"; // plasmic-import: BP7V3EkXPURJVwwMyWoHn/projectcss
 import sty from "./PlasmicCommentsDialogHead.module.css"; // plasmic-import: tccr1SFVw_AY/css
 
 import CloseIcon from "../plasmic_kit/PlasmicIcon__Close"; // plasmic-import: hy7vKrgdAZwW4/icon
@@ -43,30 +41,33 @@ createPlasmicElementProxy;
 
 export type PlasmicCommentsDialogHead__VariantMembers = {
   canUpdateHistory: "canUpdateHistory";
+  grabbable: "grabbable";
 };
 export type PlasmicCommentsDialogHead__VariantsArgs = {
   canUpdateHistory?: SingleBooleanChoiceArg<"canUpdateHistory">;
+  grabbable?: SingleBooleanChoiceArg<"grabbable">;
 };
 type VariantPropType = keyof PlasmicCommentsDialogHead__VariantsArgs;
 export const PlasmicCommentsDialogHead__VariantProps =
-  new Array<VariantPropType>("canUpdateHistory");
+  new Array<VariantPropType>("canUpdateHistory", "grabbable");
 
 export type PlasmicCommentsDialogHead__ArgsType = {};
 type ArgPropType = keyof PlasmicCommentsDialogHead__ArgsType;
 export const PlasmicCommentsDialogHead__ArgProps = new Array<ArgPropType>();
 
 export type PlasmicCommentsDialogHead__OverridesType = {
-  root?: Flex__<"div">;
-  head?: Flex__<"div">;
-  commentsHeader?: Flex__<typeof CommentsHeader>;
+  root?: Flex__<typeof DialogHeader>;
+  name?: Flex__<"div">;
+  type?: Flex__<"div">;
+  freeBox?: Flex__<"div">;
   threadHistoryStatus?: Flex__<typeof ThreadHistoryStatus>;
   close?: Flex__<typeof IconButton>;
   svg?: Flex__<"svg">;
-  listSectionSeparator?: Flex__<typeof ListSectionSeparator>;
 };
 
 export interface DefaultCommentsDialogHeadProps {
   canUpdateHistory?: SingleBooleanChoiceArg<"canUpdateHistory">;
+  grabbable?: SingleBooleanChoiceArg<"grabbable">;
   className?: string;
 }
 
@@ -106,61 +107,40 @@ function PlasmicCommentsDialogHead__RenderFunc(props: {
         path: "canUpdateHistory",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.canUpdateHistory,
+      },
+      {
+        path: "grabbable",
+        type: "private",
+        variableType: "variant",
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) => $props.grabbable,
       },
     ],
     [$props, $ctx, $refs]
   );
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
     $queries: {},
+    $q: {},
     $refs,
   });
 
   const styleTokensClassNames = _useStyleTokens();
 
   return (
-    <div
+    <DialogHeader
       data-plasmic-name={"root"}
       data-plasmic-override={overrides.root}
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
-      className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
-        styleTokensClassNames,
-        sty.root
-      )}
-    >
-      <div
-        data-plasmic-name={"head"}
-        data-plasmic-override={overrides.head}
-        className={classNames(projectcss.all, sty.head)}
-      >
-        <CommentsHeader
-          data-plasmic-name={"commentsHeader"}
-          data-plasmic-override={overrides.commentsHeader}
-          className={classNames("__wab_instance", sty.commentsHeader, {
-            [sty.commentsHeadercanUpdateHistory]: hasVariant(
-              $state,
-              "canUpdateHistory",
-              "canUpdateHistory"
-            ),
-          })}
-        />
-
+      actions={
         <div
-          className={classNames(projectcss.all, sty.freeBox__zvXog, {
-            [sty.freeBoxcanUpdateHistory__zvXoGrIxi6]: hasVariant(
-              $state,
-              "canUpdateHistory",
-              "canUpdateHistory"
-            ),
-          })}
+          data-plasmic-name={"freeBox"}
+          data-plasmic-override={overrides.freeBox}
+          className={classNames("all", sty.freeBox)}
         >
           <ThreadHistoryStatus
             data-plasmic-name={"threadHistoryStatus"}
@@ -174,80 +154,94 @@ function PlasmicCommentsDialogHead__RenderFunc(props: {
             })}
           />
 
-          <div
-            className={classNames(projectcss.all, sty.freeBox__smvQk, {
-              [sty.freeBoxcanUpdateHistory__smvQKrIxi6]: hasVariant(
+          <IconButton
+            data-plasmic-name={"close"}
+            data-plasmic-override={overrides.close}
+            className={classNames("__wab_instance", sty.close, {
+              [sty.closecanUpdateHistory]: hasVariant(
                 $state,
                 "canUpdateHistory",
                 "canUpdateHistory"
               ),
             })}
+            withBackgroundHover={true}
           >
-            <IconButton
-              data-plasmic-name={"close"}
-              data-plasmic-override={overrides.close}
-              size={"medium"}
-              type={[]}
-              withBackgroundHover={true}
-            >
-              <PlasmicIcon__
-                data-plasmic-name={"svg"}
-                data-plasmic-override={overrides.svg}
-                PlasmicIconType={
-                  hasVariant($state, "canUpdateHistory", "canUpdateHistory")
-                    ? CloseIcon
-                    : CloseIcon
-                }
-                className={classNames(projectcss.all, sty.svg, {
-                  [sty.svgcanUpdateHistory]: hasVariant(
-                    $state,
-                    "canUpdateHistory",
-                    "canUpdateHistory"
-                  ),
-                })}
-                role={"img"}
-              />
-            </IconButton>
-          </div>
+            <CloseIcon
+              data-plasmic-name={"svg"}
+              data-plasmic-override={overrides.svg}
+              className={classNames("all", sty.svg, {
+                [sty.svgcanUpdateHistory]: hasVariant(
+                  $state,
+                  "canUpdateHistory",
+                  "canUpdateHistory"
+                ),
+              })}
+              role={"img"}
+            />
+          </IconButton>
         </div>
-      </div>
-      <ListSectionSeparator
-        data-plasmic-name={"listSectionSeparator"}
-        data-plasmic-override={overrides.listSectionSeparator}
-        className={classNames("__wab_instance", sty.listSectionSeparator)}
-      />
-    </div>
+      }
+      className={classNames("__wab_instance", sty.root, {
+        [sty.rootcanUpdateHistory]: hasVariant(
+          $state,
+          "canUpdateHistory",
+          "canUpdateHistory"
+        ),
+        [sty.rootgrabbable]: hasVariant($state, "grabbable", "grabbable"),
+      })}
+      grabbable={
+        hasVariant($state, "grabbable", "grabbable") ? true : undefined
+      }
+      heading={
+        <div
+          data-plasmic-name={"name"}
+          data-plasmic-override={overrides.name}
+          className={classNames("all", "__wab_text", sty.name)}
+        >
+          {"Heading"}
+        </div>
+      }
+      subheading={
+        <div
+          data-plasmic-name={"type"}
+          data-plasmic-override={overrides.type}
+          className={classNames("all", "__wab_text", sty.type)}
+        >
+          {"Subheading that is really really really really really really long"}
+        </div>
+      }
+    />
   ) as React.ReactElement | null;
 }
 
 const PlasmicDescendants = {
   root: [
     "root",
-    "head",
-    "commentsHeader",
+    "name",
+    "type",
+    "freeBox",
     "threadHistoryStatus",
     "close",
     "svg",
-    "listSectionSeparator",
   ],
-  head: ["head", "commentsHeader", "threadHistoryStatus", "close", "svg"],
-  commentsHeader: ["commentsHeader"],
+  name: ["name"],
+  type: ["type"],
+  freeBox: ["freeBox", "threadHistoryStatus", "close", "svg"],
   threadHistoryStatus: ["threadHistoryStatus"],
   close: ["close", "svg"],
   svg: ["svg"],
-  listSectionSeparator: ["listSectionSeparator"],
 } as const;
 type NodeNameType = keyof typeof PlasmicDescendants;
 type DescendantsType<T extends NodeNameType> =
   (typeof PlasmicDescendants)[T][number];
 type NodeDefaultElementType = {
-  root: "div";
-  head: "div";
-  commentsHeader: typeof CommentsHeader;
+  root: typeof DialogHeader;
+  name: "div";
+  type: "div";
+  freeBox: "div";
   threadHistoryStatus: typeof ThreadHistoryStatus;
   close: typeof IconButton;
   svg: "svg";
-  listSectionSeparator: typeof ListSectionSeparator;
 };
 
 type ReservedPropsType = "variants" | "args" | "overrides";
@@ -261,7 +255,8 @@ type NodeComponentProps<T extends NodeNameType> =
     variants?: PlasmicCommentsDialogHead__VariantsArgs;
     args?: PlasmicCommentsDialogHead__ArgsType;
     overrides?: NodeOverridesType<T>;
-  } & Omit<PlasmicCommentsDialogHead__VariantsArgs, ReservedPropsType> & // Specify variants directly as props
+  } & // Specify variants directly as props
+  Omit<PlasmicCommentsDialogHead__VariantsArgs, ReservedPropsType> &
     // Specify args directly as props
     Omit<PlasmicCommentsDialogHead__ArgsType, ReservedPropsType> &
     // Specify overrides for each element directly as props
@@ -310,12 +305,12 @@ export const PlasmicCommentsDialogHead = Object.assign(
   makeNodeComponent("root"),
   {
     // Helper components rendering sub-elements
-    head: makeNodeComponent("head"),
-    commentsHeader: makeNodeComponent("commentsHeader"),
+    _name: makeNodeComponent("name"),
+    type: makeNodeComponent("type"),
+    freeBox: makeNodeComponent("freeBox"),
     threadHistoryStatus: makeNodeComponent("threadHistoryStatus"),
     close: makeNodeComponent("close"),
     svg: makeNodeComponent("svg"),
-    listSectionSeparator: makeNodeComponent("listSectionSeparator"),
 
     // Metadata about props expected for PlasmicCommentsDialogHead
     internalVariantProps: PlasmicCommentsDialogHead__VariantProps,

@@ -1,6 +1,13 @@
 {
   "name": "@plasmicapp/nextjs-app-router",
-  "version": "1.0.23",
+  "version": "1.0.30",
+  "description": "(DEPRECATED) Helpers for extracting Plasmic query data under the Next.js App Router.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "packages/nextjs-app-router"
+  },
   "types": "./dist/index.d.ts",
   "main": "./dist/index.js",
   "module": "./dist/index.esm.js",
@@ -14,19 +21,18 @@
     "node": ">=16"
   },
   "scripts": {
-    "build": "yarn build:types && yarn build:index && yarn build:react-server && yarn build:with-dev-server",
-    "build:types": "yarn tsc",
+    "build": "pnpm build:types && pnpm build:index && pnpm build:react-server && pnpm build:with-dev-server",
+    "build:types": "tsc",
     "build:index": "node ../../build.mjs ./src/index.ts --use-client",
     "build:with-dev-server": "esbuild --format=cjs --target=node18 --bundle --outfile=./dist/with-plasmic-prepass.cjs.js --platform=node ./src/with-dev-server.mts",
     "build:react-server": "node ../../build.mjs ./src/react-server.ts",
-    "test": "yarn --cwd=../.. test",
-    "coverage": "yarn --cwd=../.. test --coverage --passWithNoTests",
-    "lint": "eslint",
-    "prepare": "if-env PREPARE_NO_BUILD=true || yarn build"
+    "test": "pnpm -w test --passWithNoTests",
+    "coverage": "pnpm -w test --coverage --passWithNoTests",
+    "lint": "eslint"
   },
   "dependencies": {
-    "@plasmicapp/prepass": "1.0.24",
-    "@plasmicapp/query": "0.1.84",
+    "@plasmicapp/prepass": "1.0.28",
+    "@plasmicapp/query": "0.1.87",
     "cross-port-killer": "1.4.0",
     "cross-spawn": "^7.0.3",
     "get-port": "^7.0.0",
@@ -67,7 +73,7 @@
   },
   "devDependencies": {
     "@types/cross-spawn": "^6.0.6",
-    "@types/node": "^20.8.9",
+    "@types/node": "^20.19.43",
     "@types/react": "^18",
     "@types/yargs": "^17.0.35",
     "next": "^13.5.11",

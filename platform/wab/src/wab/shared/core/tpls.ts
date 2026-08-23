@@ -37,6 +37,7 @@ import {
   isKnownFunctionExpr,
   isKnownFunctionType,
   isKnownGenericEventHandler,
+  isKnownMapExpr,
   isKnownNodeMarker,
   isKnownObjectPath,
   isKnownPageHref,
@@ -53,6 +54,7 @@ import {
   isKnownVarRef,
   isKnownVirtualRenderExpr,
   Marker,
+  MultiChoice,
   NodeMarker,
   ObjectPath,
   Param,
@@ -108,6 +110,7 @@ import {
   InvalidCodePathError,
   isArrayOfLiterals,
   isNonNil,
+  isOneOf,
   maybe,
   mkShortId,
   notNil,
@@ -137,7 +140,6 @@ import {
 } from "@/wab/shared/core/exprs";
 import { mkVar } from "@/wab/shared/core/lang";
 import { metaSvc } from "@/wab/shared/core/metas";
-import { isTagInline } from "@/wab/shared/core/rich-text-util";
 import { extractComponentUsages, writeable } from "@/wab/shared/core/sites";
 import { isSlotSelection, SlotSelection } from "@/wab/shared/core/slots";
 import { isOnChangeParam } from "@/wab/shared/core/states";
@@ -147,6 +149,7 @@ import {
 } from "@/wab/shared/core/style-props";
 import * as styles from "@/wab/shared/core/styles";
 import { getCssInitial } from "@/wab/shared/css";
+import type { EffectiveVariantSetting } from "@/wab/shared/effective-variant-setting";
 import { CanvasEnv, tryEvalExpr } from "@/wab/shared/eval";
 import {
   makeDataTokenIdentifier,
@@ -222,7 +225,7 @@ export const extraAtomicTags = new Set(["select", "svg", "textarea"]);
 
 export const isTableSubElement = (
   tpl: /*TWZ*/ TplTag | TplTag | TplTag | TplTag
-) => [...Html.tableTags].includes(tpl.tag);
+) => isOneOf(tpl.tag, Html.tableTags);
 
 export const isTableTopElement = (tpl) => tpl.tag === "table";
 
@@ -1062,7 +1065,7 @@ export function checkTplIntegrity(
     return `[${path.map((tpl) => summarizeTpl(tpl)).join(" > ")}]`;
   }
   function rec(path: TplNode[]) {
-    const tpl = ensure(L.last(path), "Path should atleast have root");
+    const tpl = ensure(L.last(path), "Path should at least have root");
     switchType(tpl)
       .when([TplTag, TplComponent], (_tpl) => {
         const children = $$$(_tpl).children().toArrayOfTplNodes();
@@ -1276,7 +1279,7 @@ export function fixParentPointers(root: TplNode) {
   walkTpls(root, {
     pre(tpl, path) {
       if (tpl !== root) {
-        tpl.parent = ensure(L.last(path), "Path should atleast have root");
+        tpl.parent = ensure(L.last(path), "Path should at least have root");
       }
     },
   });
@@ -1580,8 +1583,8 @@ export function cloneType<T extends Type>(type_: T): T {
   return switchType<Type>(type)
     .when([Scalar, Img, HrefType], () => typeFactory[type.name]())
     .when([AnyType, QueryData, TargetType], () => typeFactory[type.name]())
-    .when(Choice, (t) =>
-      typeFactory.choice(
+    .when([Choice, MultiChoice], (t) =>
+      typeFactory[t.name](
         isArrayOfLiterals(t.options)
           ? t.options
           : t.options.map((op) => ({
@@ -1945,6 +1948,73 @@ export function isTplPicture(tpl: TplNode): tpl is TplPictureTag {
   return isTplImage(tpl) && tpl.tag === "img";
 }
 
+export type TplType =
+  | "text"
+  | "heading"
+  | "image"
+  | "link"
+  | "input"
+  | "passwordInput"
+  | "button"
+  | "textarea"
+  | "slot"
+  | "component"
+  | "freeContainer"
+  | "vertStack"
+  | "horizStack"
+  | "grid"
+  | "contentLayout";
+
+export function getTplType(
+  node: TplNode | SlotSelection,
+  vs?: EffectiveVariantSetting
+): TplType {
+  if (node instanceof SlotSelection || isTplSlot(node)) {
+    return "slot";
+  } else if (isTplComponent(node)) {
+    return "component";
+  } else if (isTplImage(node)) {
+    return "image";
+  } else if (isTplTag(node)) {
+    if (node.tag === "img") {
+      return "image";
+    } else if (node.tag === "a") {
+      return "link";
+    } else if (node.tag === "input") {
+      if (
+        vs &&
+        vs.attrs.type &&
+        Exprs.tryExtractLit(vs.attrs.type) === "password"
+      ) {
+        return "passwordInput";
+      }
+      return "input";
+    } else if (node.tag === "button") {
+      return "button";
+    } else if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(node.tag)) {
+      return "heading";
+    } else if (isTplTextBlock(node)) {
+      return "text";
+    } else if (node.tag === "textarea") {
+      return "textarea";
+    } else if (vs) {
+      switch (getRshContainerType(vs.rshWithTheme())) {
+        case ContainerLayoutType.free:
+          return "freeContainer";
+        case ContainerLayoutType.flexColumn:
+          return "vertStack";
+        case ContainerLayoutType.flexRow:
+          return "horizStack";
+        case ContainerLayoutType.grid:
+          return "grid";
+        case ContainerLayoutType.contentLayout:
+          return "contentLayout";
+      }
+    }
+  }
+  return "freeContainer";
+}
+
 export function isTplOther(tplNode: TplNode): tplNode is TplContainerTag {
   if (!isTplTag(tplNode)) {
     return false;
@@ -2115,6 +2185,22 @@ export function getTplOwnerComponent(tpl: TplNode) {
 
 export function tryGetTplOwnerComponent(tpl: TplNode) {
   return TPLROOT_TO_COMPONENT.get(ensureKnownTplNode($$$(tpl).root().one()));
+}
+
+export function tryGetTplByUuid(
+  component: Component,
+  uuid: string
+): TplNode | undefined {
+  return flattenTpls(component.tplTree).find((t) => t.uuid === uuid);
+}
+
+export function tryGetTplByName(
+  component: Component,
+  name: string
+): TplNode | undefined {
+  return flattenTpls(component.tplTree)
+    .filter(isTplNamable)
+    .find((t) => t.name === name);
 }
 
 export function trackComponentRoot(component: Component) {
@@ -2425,7 +2511,7 @@ export function duplicateMarkerTpl(text: RawText, tpl: TplNode) {
     if (markerPointsToTpl(marker, tpl)) {
       // If we're duplicating a block TplTag, we need to add a "\n"
       // between the existing and the new tpl.
-      const blockLineBreak = isTagInline(tpl.tag) ? "" : "\n";
+      const blockLineBreak = Html.isTagInline(tpl.tag) ? "" : "\n";
 
       // Add marker.
       const newMarker = new NodeMarker({
@@ -2493,6 +2579,10 @@ export function pushExprs(exprs: Expr[], expr: Expr | null | undefined) {
     for (const _expr of expr.exprs) {
       pushExprs(exprs, _expr);
     }
+  } else if (isKnownMapExpr(expr)) {
+    for (const _expr of Object.values(expr.mapExpr)) {
+      pushExprs(exprs, _expr);
+    }
   } else if (isKnownFunctionArg(expr)) {
     pushExprs(exprs, expr.expr);
   } else if (isKnownTemplatedString(expr)) {
@@ -2505,6 +2595,9 @@ export function pushExprs(exprs: Expr[], expr: Expr | null | undefined) {
     pushExprs(exprs, expr.bodyExpr);
   } else if (isKnownDataSourceOpExpr(expr)) {
     pushExprs(exprs, expr.queryInvalidation);
+    // A cache key is a real expr and can reference queries/params/state, so it
+    // has to be visited too — renames that skip it silently break the key.
+    pushExprs(exprs, expr.cacheKey);
     for (const template of Object.values(expr.templates)) {
       if (isKnownExpr(template.value)) {
         pushExprs(exprs, template.value);

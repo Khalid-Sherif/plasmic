@@ -12,6 +12,8 @@ import {
 import ColorSwatch from "@/wab/client/components/style-controls/ColorSwatch";
 import { Matcher } from "@/wab/client/components/view-common";
 import { useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import { UiActionsOverlay } from "@/wab/client/studio-ctx/ui/studio-ui-actions";
+import { mkModelUiId } from "@/wab/client/studio-ctx/ui/studio-ui-ids";
 import {
   StyleTokenValue,
   isStyleTokenEditable,
@@ -30,6 +32,7 @@ import { StyleToken } from "@/wab/shared/model/classes";
 import { Menu } from "antd";
 import { sortBy } from "lodash";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 
 const StyleTokenRow = observer(function _StyleTokenRow(props: {
@@ -48,9 +51,9 @@ const StyleTokenRow = observer(function _StyleTokenRow(props: {
 
   const onFindReferences = () => {
     spawn(
-      studioCtx.change(({ success }) => {
+      studioCtx.change(() => {
         studioCtx.findReferencesStyleToken = token.base;
-        return success();
+        return ok();
       })
     );
   };
@@ -80,9 +83,9 @@ const StyleTokenRow = observer(function _StyleTokenRow(props: {
               <Menu.Item
                 key="remove-global-variant-value"
                 onClick={async () => {
-                  return studioCtx.change(({ success }) => {
+                  return studioCtx.change(() => {
                     vsh.removeVariantedValue(token);
-                    return success();
+                    return ok();
                   });
                 }}
               >
@@ -128,9 +131,9 @@ const StyleTokenRow = observer(function _StyleTokenRow(props: {
           <Menu.Item
             key="remove-global-variant-value"
             onClick={async () => {
-              return studioCtx.change(({ success }) => {
+              return studioCtx.change(() => {
                 vsh.removeVariantedValue(token);
-                return success();
+                return ok();
               });
             }}
           >
@@ -291,6 +294,7 @@ const StyleTokenRow = observer(function _StyleTokenRow(props: {
           indicatorType={indicatorType}
         />
       )}
+      <UiActionsOverlay uiId={mkModelUiId(token.base)} />
     </>
   );
 });

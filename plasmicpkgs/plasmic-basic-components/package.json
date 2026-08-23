@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/plasmic-basic-components",
-  "version": "0.0.276",
-  "description": "Plasmic registration call for the HTML5 video element",
+  "version": "0.0.289",
+  "description": "Assorted basic Plasmic code components: embeds, iframes, timers, conditionals, data providers, and more.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/plasmic-basic-components"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/plasmic-basic-components.esm.js",
@@ -21,7 +28,7 @@
   "scripts": {
     "build": "tsdx build",
     "start": "tsdx watch",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test --passWithNoTests",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
     "lint": "tsdx lint",
     "prepublishOnly": "npm run build",
     "size": "size-limit",
@@ -31,9 +38,9 @@
     "test-storybook": "test-storybook"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "@plasmicapp/query": "0.1.84",
-    "@types/node": "^14.0.26",
+    "@plasmicapp/host": "2.0.17",
+    "@plasmicapp/query": "0.1.87",
+    "@types/node": "^14.18.63",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "react": "18.2.0",

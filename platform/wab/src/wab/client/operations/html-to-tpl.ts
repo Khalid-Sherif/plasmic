@@ -5,6 +5,11 @@ import {
   readAndSanitizeSvgXmlAsImage,
   ResizableImage,
 } from "@/wab/client/dom-utils";
+import {
+  WIError,
+  WIImportFailedError,
+  WITplRef,
+} from "@/wab/client/web-importer/errors";
 import { parseHtmlToWebImporterTree } from "@/wab/client/web-importer/html-parser";
 import {
   isWIBaseVariantSettings,
@@ -13,22 +18,49 @@ import {
   WIElement,
   WIFragment,
   WIScreenVariant,
-  WIStyleVariant,
+  WIText,
   WIVariant,
 } from "@/wab/client/web-importer/types";
+import { ProjectId } from "@/wab/shared/ApiSchema";
+import { CodeComponentsRegistry } from "@/wab/shared/code-components/code-components";
 import { paramToVarName, toVarName } from "@/wab/shared/codegen/util";
-import { assertNever, mkShortId, withoutNils } from "@/wab/shared/common";
+import { assert, assertNever, ensure, mkShortId } from "@/wab/shared/common";
+import {
+  interpolatedStringToCodeExpr,
+  interpolatedStringToExpr,
+  interpolatedStringToRichText,
+} from "@/wab/shared/copilot/dynamic-value-input";
+import { mkNormalizedRep } from "@/wab/shared/copilot/utils";
 import {
   code,
+  codeLit,
   customCode,
   InteractionConditionalMode,
 } from "@/wab/shared/core/exprs";
 import { ImageAssetType } from "@/wab/shared/core/image-asset-type";
 import { getTagAttrForImageAsset } from "@/wab/shared/core/image-assets";
-import { mkNameArg } from "@/wab/shared/core/lang";
-import { getResponsiveStrategy } from "@/wab/shared/core/sites";
-import { mkRuleSet } from "@/wab/shared/core/styles";
-import { AttrsSpec, TplTagType } from "@/wab/shared/core/tpls";
+import {
+  JsonValue,
+  mkNameArg,
+  mkParam,
+  ParamExportType,
+} from "@/wab/shared/core/lang";
+import { nodeMarkerText } from "@/wab/shared/core/rich-text-util";
+import {
+  allAnimationSequences,
+  getResponsiveStrategy,
+} from "@/wab/shared/core/sites";
+import { validateStylesForTpl } from "@/wab/shared/core/style-props-tpl";
+import {
+  mkRuleSet,
+  tryGetAnimationSequenceUuidFromCssVar,
+} from "@/wab/shared/core/styles";
+import {
+  AttrsSpec,
+  flattenTpls,
+  mkSlot,
+  TplTagType,
+} from "@/wab/shared/core/tpls";
 import { camelCssPropsToKebab } from "@/wab/shared/css";
 import {
   AnimationProperty,
@@ -36,27 +68,41 @@ import {
   isAnimationProperty,
   parseCssAnimationsFromStyles,
 } from "@/wab/shared/css/animations";
+import { isDynamicValue } from "@/wab/shared/dynamic-bindings";
+import { EvaluationError } from "@/wab/shared/eval/expression-parser";
 import {
   Animation,
   AnimationSequence,
   Component,
   CustomCode,
   EventHandler,
+  Expr,
   FunctionExpr,
   ImageAssetRef,
   Interaction,
+  isKnownDateRangeStrings,
+  isKnownDateString,
+  isKnownTplComponent,
+  isKnownTplSlot,
   isKnownTplTag,
   KeyFrame,
+  NodeMarker,
+  ObjectPath,
+  Param,
   RawText,
+  RichText,
   Site,
   TplNode,
   TplTag,
+  Variant,
   VariantsRef,
 } from "@/wab/shared/model/classes";
 import {
   isAnyType,
-  isBoolType,
-  isNumType,
+  isChoiceType,
+  isMultiChoiceType,
+  typeFactory,
+  wabToTsType,
 } from "@/wab/shared/model/model-util";
 import { ResponsiveStrategy } from "@/wab/shared/responsiveness";
 import { RSH } from "@/wab/shared/RuleSetHelpers";
@@ -68,20 +114,31 @@ import {
   getOrderedScreenVariantSpecs,
   getPrivateStyleVariantsForTag,
   isStandaloneVariantGroup,
+  toVariantComboKey,
   VariantCombo,
   VariantGroupType,
 } from "@/wab/shared/Variants";
 import { VariantTplMgr } from "@/wab/shared/VariantTplMgr";
-import L, { isArray, isObject } from "lodash";
+import { setTplVisibility, TplVisibility } from "@/wab/shared/visibility-utils";
+import { deserializePlasmicComponentAttrs } from "@/wab/shared/web-exporter/component-utils";
+import L, { isArray } from "lodash";
+import { err, ok, Result } from "neverthrow";
 
 export interface HtmlToTplResult {
   /** Tpl nodes ready to be inserted (multiple when root is a WIFragment) */
   tpls: TplNode[];
+  /** Partial web-importer errors collected while parsing HTML. */
+  errors: WIError[];
   /**
    * Finalize deferred changes that must happen inside studioCtx.change():
    * animation sequences, variant styles, and image asset attachment.
+   * Returns WIErrors if any; such as unknown animations, unmatched screen variants etc.
    */
-  finalize: (opts: { component: Component; tplMgr: TplMgr }) => void;
+  finalize: (opts: {
+    component: Component;
+    tplMgr: TplMgr;
+    ccRegistry: CodeComponentsRegistry;
+  }) => WIError[];
 }
 
 /**
@@ -89,10 +146,11 @@ export interface HtmlToTplResult {
  *
  * @param html - The HTML string to convert.
  * @param opts - Site, VariantTplMgr, and AppCtx needed for conversion.
- * @returns `{ tpls, finalize }` where:
+ * @returns
  *   - `tpls` is an array of fully built TplNode trees (multiple when root is a fragment).
  *   - `finalize(opts)` must be called inside `studioCtx.change()` to apply
  *     animation sequences, variant styles, and image assets to the Site.
+ *   - WIImportFailedError when there is nothing to insert.
  */
 export async function htmlToTpl(
   html: string,
@@ -101,32 +159,43 @@ export async function htmlToTpl(
     vtm: VariantTplMgr;
     appCtx: AppCtx;
   }
-): Promise<HtmlToTplResult | null> {
+): Promise<Result<HtmlToTplResult, WIImportFailedError>> {
   const { site, vtm, appCtx } = opts;
 
-  const { wiTree, animationSequences } = await parseHtmlToWebImporterTree(
-    html,
-    site
-  );
-
-  if (!wiTree) {
-    return null;
+  const parseResult = await parseHtmlToWebImporterTree(html, site);
+  if (parseResult.isErr()) {
+    return err(parseResult.error);
   }
+  const { wiTree, animationSequences, errors: parseErrors } = parseResult.value;
 
-  const result = await wiTreeToTpl(wiTree, { site, vtm, appCtx });
-  if (!result) {
-    return null;
-  }
+  const errors: WIError[] = [...parseErrors];
 
-  const { tpls, tplImageAssetMap, tplVariantSettingsData } = result;
-
-  return {
+  const {
     tpls,
+    tplImageAssetMap,
+    tplVariantSettingsData,
+    tplRepeatData,
+    tplVisibilityData,
+  } = await wiTreeToTpl(wiTree, { site, vtm, appCtx, errors });
+
+  if (tpls.length === 0) {
+    return err(
+      new WIImportFailedError(
+        "nothing-to-insert",
+        errors,
+        "No elements could be built from the HTML snippet"
+      )
+    );
+  }
+
+  return ok({
+    tpls,
+    errors,
     finalize: (finalizeOpts) => {
+      const htmlToTplErrors: WIError[] = [];
+
       // Process Animation Sequences (keyframes)
-      wiAnimationSequenceToSiteAnimationSequence(animationSequences, {
-        site,
-      });
+      upsertAnimationSequences(animationSequences, { site });
 
       const owningComponent = finalizeOpts.component;
 
@@ -135,27 +204,62 @@ export async function htmlToTpl(
         for (const vs of vsData) {
           const { variantCombo, safeStyles, unsafeStyles, wiAnimations } = vs;
 
-          const animations = wiAnimations
-            ? wiAnimationsToSiteAnimations(wiAnimations, { site })
-            : null;
+          let animations: Animation[] | null = null;
+          if (wiAnimations) {
+            const resolved = wiAnimationsToSiteAnimations(wiAnimations, {
+              site,
+            });
+            htmlToTplErrors.push(...resolved.errors);
+            animations = resolved.animations;
+          }
 
-          // Process style variants by creating private style variants
-          const processedVariantCombo = withoutNils(
-            variantCombo.map((wiVariant) => {
+          // Resolve every WIVariant in the combo up front. If any member
+          // cannot be resolved, applying the styles to the remaining (weaker)
+          // combo would mistarget them e.g. hover styles from a missing media query
+          // landing on every screen size — so the whole variant setting is
+          // skipped and reported instead.
+          const unresolved: WIError[] = [];
+          for (const wiVariant of variantCombo) {
+            if (
+              wiVariant.type === VariantGroupType.GlobalScreen &&
+              !findMatchingScreenVariant(site, wiVariant)
+            ) {
+              unresolved.push({
+                code: "unmatched-screen-variant",
+                width: wiVariant.width,
+              });
+            } else if (wiVariant.type === "style" && !isKnownTplTag(tplNode)) {
+              // Element states only work on TplTag; they don't apply on
+              // TplComponent and TplSlot.
+              unresolved.push({
+                code: "unsupported-style-variant",
+                tpl: tplRef(tplNode),
+                selectors: wiVariant.selectors,
+              });
+            }
+          }
+          if (unresolved.length > 0) {
+            htmlToTplErrors.push(...unresolved);
+            continue;
+          }
+
+          const processedVariantCombo: VariantCombo = variantCombo.map(
+            (wiVariant): Variant => {
               switch (wiVariant.type) {
                 case "base": {
                   return getBaseVariant(owningComponent);
                 }
                 case VariantGroupType.GlobalScreen: {
-                  return findMatchingScreenVariant(site, wiVariant);
+                  return ensure(
+                    findMatchingScreenVariant(site, wiVariant),
+                    "screen variant resolvability checked above"
+                  );
                 }
                 case "style": {
-                  // Currently, in HTML parser, we support for private style variants that only works on TplTag i.e
-                  // Element states doesn't apply on TplComponent and TplSlot.
-                  if (!isKnownTplTag(tplNode)) {
-                    return null;
-                  }
-
+                  assert(
+                    isKnownTplTag(tplNode),
+                    "style variant applicability checked above"
+                  );
                   const selectors = wiVariant.selectors.map((s) => `:${s}`);
                   const existingPrivateStyleVariant =
                     getPrivateStyleVariantsForTag(
@@ -174,7 +278,7 @@ export async function htmlToTpl(
                   );
                 }
               }
-            })
+            }
           );
 
           applyVariantStyles(
@@ -183,8 +287,35 @@ export async function htmlToTpl(
             processedVariantCombo,
             safeStyles,
             unsafeStyles,
-            animations
+            animations,
+            finalizeOpts.ccRegistry,
+            htmlToTplErrors
           );
+        }
+      }
+
+      const baseCombo = [getBaseVariant(owningComponent)];
+
+      // Apply data-repeat onto the base variant setting. Run in finalize/studioCtx.change,
+      // since assigning dataRep outside change() serializes the value but the canvas env
+      // does not register the repeat locals (currentItem/currentIndex).
+      for (const [tplNode, rep] of tplRepeatData.entries()) {
+        vtm.ensureBaseVariantSetting(tplNode).dataRep = mkNormalizedRep(
+          rep.collection,
+          rep.itemName,
+          rep.indexName
+        );
+      }
+
+      // Apply inline visibility (data-visibility / data-visible-if). Done in finalize
+      // (after style merge) because setTplVisibility writes a RuleSet flag
+      // (PLASMIC_DISPLAY_NONE) that must not be  overwritten by the WI style merge.
+      for (const [tplNode, vis] of tplVisibilityData.entries()) {
+        setTplVisibility(tplNode, baseCombo, vis.visibility);
+        if (vis.visibility === TplVisibility.CustomExpr && vis.dataCond) {
+          // Overwrite the placeholder dataCond that setTplVisibility set with
+          // the real condition expression.
+          ensureVariantSetting(tplNode, baseCombo).dataCond = vis.dataCond;
         }
       }
 
@@ -202,8 +333,10 @@ export async function htmlToTpl(
         });
         L.merge(vs.attrs, assetAttrs);
       }
+
+      return htmlToTplErrors;
     },
-  };
+  });
 }
 
 // Attrs handled via dedicated paths instead of vs.attrs. Exported so copilot
@@ -214,10 +347,16 @@ export const htmlAttrsIgnoredByTpl = new Set([
   "style", // RuleSet styles (split to safe/unsafe)
   "data-plasmic-name", // Tpl name
   "data-plasmic-component", // Plasmic metadata
+  "data-plasmic-project", // Plasmic metadata (imported-project disambiguation)
   "data-props", // Plasmic metadata
-  "slot", // Plasmic slot
+  "slot", // web-components attr with no Plasmic meaning
   "src", // image asset
   "srcset", // image asset
+  "data-repeat", // repetition collection (dataRep)
+  "data-repeat-item", // repetition item local-var name
+  "data-repeat-index", // repetition index local-var name
+  "data-visible-if", // dynamic visibility condition (dataCond)
+  "data-visibility", // static visibility state (displayNone / notRendered)
 ]);
 
 /** Matches both lowercase HTML (`onclick`) and camelCase React (`onClick`). */
@@ -273,16 +412,58 @@ type TplVariantSettingsData = {
   wiAnimations: CssAnimation[] | null;
 };
 
+type TplVisibilityData = {
+  visibility: TplVisibility;
+  /** Present only for TplVisibility.CustomExpr (the data-visible-if condition). */
+  dataCond?: ObjectPath | CustomCode;
+};
+
+type TplRepeatData = {
+  collection: ObjectPath | CustomCode;
+  itemName?: string;
+  indexName?: string;
+};
+
+function tplRef(tpl: TplNode): WITplRef {
+  return {
+    type: isKnownTplComponent(tpl)
+      ? "TplComponent"
+      : isKnownTplSlot(tpl)
+      ? "TplSlot"
+      : "TplTag",
+    uuid: tpl.uuid,
+  };
+}
+
 function applyVariantStyles(
   vtm: VariantTplMgr,
   tpl: TplNode,
   variantCombo: VariantCombo,
   safeStyles: Record<string, string>,
   unsafeStyles: Record<string, string>,
-  animations: Animation[] | null
+  animations: Animation[] | null,
+  ccRegistry: CodeComponentsRegistry,
+  htmlToTplErrors: WIError[]
 ) {
   const vs = vtm.ensureVariantSetting(tpl, variantCombo);
-  RSH(vs.rs, tpl).merge(safeStyles);
+  // Only styles Studio allows on this tpl may enter the RuleSet; the rest are
+  // dropped and reported in errors.
+  const { valid, invalid } = validateStylesForTpl(
+    safeStyles,
+    tpl,
+    vtm.effectiveRsh(tpl, variantCombo),
+    ccRegistry
+  );
+  RSH(vs.rs, tpl).merge(valid);
+  const invalidProps = Object.keys(invalid);
+  if (invalidProps.length > 0) {
+    htmlToTplErrors.push({
+      code: "styles-not-applicable",
+      tpl: tplRef(tpl),
+      props: invalidProps,
+      variantDesc: toVariantComboKey(variantCombo),
+    });
+  }
 
   if (Object.keys(unsafeStyles).length > 0) {
     vs.attrs["style"] = code(JSON.stringify(unsafeStyles));
@@ -324,9 +505,14 @@ function findMatchingScreenVariant(
 
 async function wiTreeToTpl(
   wiTree: WIElement,
-  opts: { site: Site; vtm: VariantTplMgr; appCtx: AppCtx }
+  opts: {
+    site: Site;
+    vtm: VariantTplMgr;
+    appCtx: AppCtx;
+    errors: WIError[];
+  }
 ) {
-  const { site, vtm, appCtx } = opts;
+  const { site, vtm, appCtx, errors } = opts;
   const tplImageAssetMap = new Map<
     TplTag,
     {
@@ -335,13 +521,60 @@ async function wiTreeToTpl(
     }
   >();
   const tplVariantSettingsData = new Map<TplNode, TplVariantSettingsData[]>();
+  // Repetition (data-repeat) and visibility (data-visibility / data-visible-if),
+  // are both applied in finalize.
+  const tplRepeatData = new Map<TplNode, TplRepeatData>();
+  const tplVisibilityData = new Map<TplNode, TplVisibilityData>();
+
+  function collectDataRepeat(node: WIBase, tpl: TplNode) {
+    const collectionStr = node.attrs["data-repeat"];
+    if (collectionStr === undefined) {
+      return;
+    }
+    tplRepeatData.set(tpl, {
+      collection: interpolatedStringToCodeExpr(collectionStr),
+      itemName: node.attrs["data-repeat-item"],
+      indexName: node.attrs["data-repeat-index"],
+    });
+  }
+  function collectVisibility(node: WIBase, tpl: TplNode) {
+    const visibleIf = node.attrs["data-visible-if"];
+    if (visibleIf !== undefined) {
+      tplVisibilityData.set(tpl, {
+        visibility: TplVisibility.CustomExpr,
+        dataCond: interpolatedStringToCodeExpr(visibleIf),
+      });
+      return;
+    }
+    const visibility = node.attrs["data-visibility"];
+    if (visibility === "displayNone") {
+      tplVisibilityData.set(tpl, { visibility: TplVisibility.DisplayNone });
+    } else if (visibility === "notRendered") {
+      tplVisibilityData.set(tpl, { visibility: TplVisibility.NotRendered });
+    } else if (visibility !== undefined && visibility !== "visible") {
+      throw new EvaluationError(
+        `Invalid data-visibility value ${JSON.stringify(
+          visibility
+        )}. Expected "visible", "displayNone", or "notRendered"; use data-visible-if for a dynamic condition.`
+      );
+    }
+  }
+
+  /** Collect repetition + visibility bindings authored via `data-*` attributes. */
+  function collectStructuralBindings(node: WIBase, tpl: TplNode) {
+    collectDataRepeat(node, tpl);
+    collectVisibility(node, tpl);
+  }
 
   function collectWIVariantData(
     node: Exclude<WIElement, WIFragment>,
     tpl: TplNode
   ) {
+    // Container layout defaults don't apply to text and slots nodes.
     const defaultStyles: Record<string, string> =
-      node.type === "text"
+      node.type === "text" ||
+      node.type === "slot-target" ||
+      node.type === "component"
         ? {}
         : {
             display: "flex",
@@ -393,39 +626,14 @@ async function wiTreeToTpl(
         splitStylesByAnimations(variantSetting.safeStyles);
       const animations = parseCssAnimationsFromStyles(animationStyles);
 
-      const tplVSData: TplVariantSettingsData = {
-        variantCombo: [],
-        safeStyles: vsSafeStyles,
-        unsafeStyles: { ...unsafeBaseStyles, ...variantSetting.unsafeStyles },
-        wiAnimations: animations,
-      };
-
-      // Find screen and style variants in combo
-      const screenVariantInCombo = variantSetting.variantCombo.find(
-        (v) => v.type === VariantGroupType.GlobalScreen
-      ) as WIScreenVariant | undefined;
-
-      if (screenVariantInCombo) {
-        const matchingScreenVariant = findMatchingScreenVariant(
-          site,
-          screenVariantInCombo
-        );
-        if (matchingScreenVariant) {
-          tplVSData.variantCombo.push(screenVariantInCombo);
-        }
-      }
-
-      const styleVariantInCombo = variantSetting.variantCombo.find(
-        (v) => v.type === "style"
-      ) as WIStyleVariant | undefined;
-
-      if (styleVariantInCombo) {
-        tplVSData.variantCombo.push(styleVariantInCombo);
-      }
-
-      // Make sure we have at-least one valid variant.
-      if (tplVSData.variantCombo.length > 0) {
-        tplVariantSettings.push(tplVSData);
+      // Keep the full combo unresolved here, finalize resolves it all-or-nothing.
+      if (variantSetting.variantCombo.length > 0) {
+        tplVariantSettings.push({
+          variantCombo: variantSetting.variantCombo,
+          safeStyles: vsSafeStyles,
+          unsafeStyles: { ...unsafeBaseStyles, ...variantSetting.unsafeStyles },
+          wiAnimations: animations,
+        });
       }
     }
 
@@ -446,9 +654,65 @@ async function wiTreeToTpl(
           mkEventHandlerExprFromHtmlAttrValue(value);
         continue;
       }
-      result[key] = value;
+      result[key] = isDynamicValue(value)
+        ? interpolatedStringToExpr(value)
+        : value;
     }
     return result;
+  }
+
+  /**
+   * Builds a text-type TplTag from a WIText, in the same shape the canvas
+   * text editor saves.
+   */
+  function buildTextBlockTpl(node: WIText): TplTag {
+    const markers: NodeMarker[] = [];
+    let richText: RichText;
+    if (node.content.length === 1 && typeof node.content[0] === "string") {
+      richText = interpolatedStringToRichText(node.content[0]);
+    } else {
+      let text = "";
+      const addMarkerTpl = (markerTpl: TplTag) => {
+        markers.push(
+          new NodeMarker({
+            position: text.length,
+            length: nodeMarkerText.length,
+            tpl: markerTpl,
+          })
+        );
+        text += nodeMarkerText;
+      };
+      for (const part of node.content) {
+        if (typeof part !== "string") {
+          addMarkerTpl(buildTextBlockTpl(part));
+        } else if (isDynamicValue(part)) {
+          const dynamicValTpl = vtm.mkTplTagX("span", {
+            type: TplTagType.Text,
+          });
+          vtm.ensureBaseVariantSetting(dynamicValTpl).text =
+            interpolatedStringToRichText(part);
+          addMarkerTpl(dynamicValTpl);
+        } else {
+          text += part;
+        }
+      }
+      richText = new RawText({ text, markers });
+    }
+
+    const tpl = vtm.mkTplTagX(
+      node.tag,
+      {
+        attrs: htmlAttrsToTplAttrs(node),
+        name: node.attrs["data-plasmic-name"],
+        type: TplTagType.Text,
+      },
+      // NodeMarker tpls are also the text block's normal children.
+      markers.map((m) => m.tpl)
+    );
+    vtm.ensureBaseVariantSetting(tpl).text = richText;
+    collectWIVariantData(node, tpl);
+    collectStructuralBindings(node, tpl);
+    return tpl;
   }
 
   async function rec(node: WIElement): Promise<TplNode[]> {
@@ -460,19 +724,9 @@ async function wiTreeToTpl(
     }
 
     const tplName = node.attrs["data-plasmic-name"];
+    const nodePath = node.path;
     if (node.type === "text") {
-      const tpl = vtm.mkTplTagX(node.tag, {
-        attrs: htmlAttrsToTplAttrs(node),
-        name: tplName,
-        type: TplTagType.Text,
-      });
-      const vs = vtm.ensureBaseVariantSetting(tpl);
-      vs.text = new RawText({
-        markers: [],
-        text: node.text,
-      });
-      collectWIVariantData(node, tpl);
-      return [tpl];
+      return [buildTextBlockTpl(node)];
     }
 
     if (node.type === "svg") {
@@ -489,6 +743,7 @@ async function wiTreeToTpl(
           undefined
         );
         if (!imageResult || !imageOpts) {
+          errors.push({ code: "svg-upload-failed", path: nodePath });
           return [];
         }
 
@@ -498,9 +753,10 @@ async function wiTreeToTpl(
           name: tplName,
         });
         collectWIVariantData(node, tpl);
+        collectStructuralBindings(node, tpl);
 
         // We will store each image to it's corresponding tpl so we can process it
-        // later to upload image and attach asset to this tpl in 'processWebImporterTree',
+        // later to upload image and attach asset to this tpl in 'finalize',
         // We cannot do that here because this function is expected to be called outside 'studioCtx.change' and
         // creating an asset here would cause a model change to occur.
         tplImageAssetMap.set(tpl, {
@@ -510,16 +766,24 @@ async function wiTreeToTpl(
 
         return [tpl];
       }
+      errors.push({ code: "svg-upload-failed", path: nodePath });
       return [];
     }
 
     if (node.type === "component") {
       const componentName = node.component;
-      const component = site.components.find(
-        (c) => toVarName(c.name) === toVarName(componentName)
-      );
+      const component = deserializePlasmicComponentAttrs(site, {
+        "data-plasmic-component": componentName,
+        "data-plasmic-project": node.depProjectId as ProjectId | undefined,
+      });
       if (!component) {
-        throw new Error(`Component not found with name ${componentName}`);
+        errors.push({
+          code: "unknown-component",
+          path: nodePath,
+          component: componentName,
+          ...(node.depProjectId && { projectId: node.depProjectId }),
+        });
+        return [];
       }
 
       // Build args from props and slots
@@ -527,15 +791,19 @@ async function wiTreeToTpl(
 
       if (node.props) {
         for (const [propName, propValue] of Object.entries(node.props)) {
-          const componentArg = getComponentArgFromHtmlProp(
+          // An invalid prop drops just that prop; the instance still inserts.
+          getComponentArgFromHtmlProp(
             component,
             componentName,
             propName,
-            propValue
+            propValue,
+            nodePath
+          ).match(
+            ([param, argValue]) => {
+              args[param.variable.name] = argValue;
+            },
+            (error) => errors.push(error)
           );
-
-          const [paramName, argValue] = componentArg;
-          args[paramName] = argValue;
         }
       }
 
@@ -545,9 +813,13 @@ async function wiTreeToTpl(
             (p) => paramToVarName(component, p) === toVarName(slotName)
           );
           if (!param) {
-            throw new Error(
-              `Slot ${slotName} doesn't exist in component ${componentName}`
-            );
+            errors.push({
+              code: "unknown-slot",
+              path: nodePath,
+              component: componentName,
+              slot: slotName,
+            });
+            continue;
           }
 
           // Recursively convert slot children to TplNodes
@@ -563,7 +835,45 @@ async function wiTreeToTpl(
         args,
       });
       collectWIVariantData(node, tplComponent);
+      collectStructuralBindings(node, tplComponent);
       return [tplComponent];
+    }
+
+    if (node.type === "slot-target") {
+      const defaultChildren = (
+        await Promise.all(node.defaultChildren.map((child) => rec(child)))
+      ).flat();
+
+      // Slot default contents only carry base variant settings, so keep
+      // only the base entries collected for the slot's descendants.
+      for (const child of defaultChildren) {
+        for (const tpl of flattenTpls(child)) {
+          const vsData = tplVariantSettingsData.get(tpl);
+          if (vsData) {
+            tplVariantSettingsData.set(
+              tpl,
+              vsData.filter((vs) =>
+                vs.variantCombo.every((v) => v.type === "base")
+              )
+            );
+          }
+        }
+      }
+
+      // The param is created detached: the owning component isn't known at
+      // build time, so whoever attaches the TplSlot to a component must
+      // register a real slot param for it, keeping only the name from this
+      // placeholder.
+      const param = mkParam({
+        name: node.name,
+        type: typeFactory.renderable(),
+        exportType: ParamExportType.External,
+        paramType: "slot",
+      });
+      const slot = mkSlot(param, defaultChildren);
+      vtm.ensureBaseVariantSetting(slot);
+      collectWIVariantData(node, slot);
+      return [slot];
     }
 
     if (node.tag === "img") {
@@ -576,15 +886,19 @@ async function wiTreeToTpl(
         return node.attrs.src;
       };
 
+      const src = getSrc();
       const tpl = vtm.mkTplImage({
         attrs: {
           ...htmlAttrsToTplAttrs(node),
-          src: code(JSON.stringify(getSrc())),
+          src: isDynamicValue(src)
+            ? interpolatedStringToExpr(src)
+            : code(JSON.stringify(src)),
         },
         type: ImageAssetType.Picture,
         name: tplName,
       });
       collectWIVariantData(node, tpl);
+      collectStructuralBindings(node, tpl);
       return [tpl];
     }
 
@@ -604,6 +918,7 @@ async function wiTreeToTpl(
       );
 
       collectWIVariantData(node, tpl);
+      collectStructuralBindings(node, tpl);
 
       return [tpl];
     }
@@ -613,69 +928,92 @@ async function wiTreeToTpl(
 
   const tpls = await rec(wiTree);
 
-  if (tpls.length === 0) {
-    return null;
-  }
-
   return {
     tpls,
     tplImageAssetMap,
     tplVariantSettingsData,
+    tplRepeatData,
+    tplVisibilityData,
   };
 }
 
-function wiAnimationSequenceToSiteAnimationSequence(
+/**
+ * Upsert WIAnimationSequences into the site. If a sequence with the same
+ * name already exists, its keyframes are replaced
+ * with the new ones. Otherwise a new AnimationSequence is created.
+ */
+export function upsertAnimationSequences(
   animationSequences: WIAnimationSequence[],
   opts: { site: Site }
-) {
+): AnimationSequence[] {
   const { site } = opts;
+  const result: AnimationSequence[] = [];
 
   for (const sequence of animationSequences) {
-    const sequenceVarName = toVarName(sequence.name);
+    const keyframes = sequence.keyframes.map(
+      (wiKeyframe) =>
+        new KeyFrame({
+          percentage: wiKeyframe.percentage,
+          // We will only utilize the safe styles here. We need to think about the unsafe styles since we don't have any
+          // better way to display them in MixinControls/AnimationSequenceControls. We can have a new custom style attribute section
+          // to store unsafe styles or arbitrary css. Since it doesn't exist yet.
+          rs: mkRuleSet({
+            values: camelCssPropsToKebab(wiKeyframe.safeStyles),
+          }),
+        })
+    );
 
+    const sequenceVarName = toVarName(sequence.name);
     const existingSequence = site.animationSequences.find(
       (existing) => toVarName(existing.name) === sequenceVarName
     );
 
-    // We will skip creating any existing sequence so that it doesn't pollute the list of animation sequences
-    // when user paste the same html multiple times.
     if (existingSequence) {
-      continue;
-    }
-
-    const keyframes = sequence.keyframes.map((wiKeyframe) => {
-      return new KeyFrame({
-        percentage: wiKeyframe.percentage,
-        // We will only utilize the safe styles here. We need to think about the unsafe styles since we don't have any
-        // better way to display them in MixinControls/AnimationSequenceControls. We can have a new custom style attribute section
-        // to store unsafe styles or arbitrary css. Since it doesn't exist yet.
-        rs: mkRuleSet({ values: camelCssPropsToKebab(wiKeyframe.safeStyles) }),
+      // Replace the keyframes on the existing sequence so any references
+      // to it (Animation.sequence on tpl RuleSets) keep pointing to the
+      // same AnimationSequence object.
+      existingSequence.keyframes = keyframes;
+      result.push(existingSequence);
+    } else {
+      const newSequence = new AnimationSequence({
+        name: sequence.name,
+        uuid: mkShortId(),
+        keyframes,
       });
-    });
-
-    const newSequence = new AnimationSequence({
-      name: sequence.name,
-      uuid: mkShortId(),
-      keyframes,
-    });
-
-    site.animationSequences.push(newSequence);
+      site.animationSequences.push(newSequence);
+      result.push(newSequence);
+    }
   }
+
+  return result;
 }
 
-function wiAnimationsToSiteAnimations(
+/**
+ * Resolve a list of CssAnimation entries (from parsed `animation` shorthand).
+ * CssAnimations whose name doesn't match any existing
+ * AnimationSequence are dropped.
+ */
+export function wiAnimationsToSiteAnimations(
   wiAnimations: CssAnimation[],
   opts: { site: Site }
-) {
+): { animations: Animation[]; errors: WIError[] } {
   const { site } = opts;
   const animations: Animation[] = [];
+  const errors: WIError[] = [];
 
   for (const wiAnim of wiAnimations) {
-    const animationSequence = site.animationSequences.find(
-      (seq) => toVarName(seq.name) === toVarName(wiAnim.name)
+    const animSeqUuid = tryGetAnimationSequenceUuidFromCssVar(wiAnim.name);
+    const animationSequences = allAnimationSequences(site, {
+      includeDeps: "direct",
+    });
+    const animationSequence = animationSequences.find(
+      (seq) =>
+        seq.uuid === animSeqUuid ||
+        toVarName(seq.name) === toVarName(wiAnim.name)
     );
 
     if (!animationSequence) {
+      errors.push({ code: "unknown-animation", animation: wiAnim.name });
       continue;
     }
 
@@ -692,7 +1030,7 @@ function wiAnimationsToSiteAnimations(
       })
     );
   }
-  return animations;
+  return { animations, errors };
 }
 
 function splitStylesByAnimations(styles: Record<string, string>): {
@@ -715,35 +1053,43 @@ function splitStylesByAnimations(styles: Record<string, string>): {
 }
 
 /**
- * Converts an HTML prop name and value to a component arg for the web importer.
+ * Converts an HTML prop name and value (in the serialized data-props format)
+ * to the matching component Param and arg Expr.
  *
- * Throws on invalid prop name, slot params, or type mismatches.
+ * Err (an `invalid-component-prop` WIError) on invalid prop name, slot params, or type mismatches.
  */
-function getComponentArgFromHtmlProp(
+export function getComponentArgFromHtmlProp(
   component: Component,
   componentName: string,
   propName: string,
-  value: unknown
-): [string, VariantsRef | CustomCode | string | number | boolean] {
+  value: unknown,
+  path?: string
+): Result<[Param, Expr], WIError> {
+  const fail = (reason: string) =>
+    err<[Param, Expr], WIError>({
+      code: "invalid-component-prop",
+      component: componentName,
+      prop: propName,
+      reason,
+      ...(path && { path }),
+    });
   const name = toVarName(propName);
   const param = component.params.find(
     (p) => paramToVarName(component, p) === name
   );
 
   if (!param) {
-    throw new Error(`Component "${componentName}" has no prop "${propName}"`);
+    return fail("no such prop exists on the component");
   }
 
   if (isSlot(param)) {
-    throw new Error(
-      `Component "${componentName}" prop "${propName}" is a slot — pass slot content as children, not as a data-prop attribute`
+    return fail(
+      "it is a slot — pass slot content as children, not as a data-prop attribute"
     );
   }
 
   if (value === undefined) {
-    throw new Error(
-      `Component "${componentName}" prop "${propName}" has undefined value`
-    );
+    return fail("value is undefined");
   }
 
   // Variant group handling
@@ -753,75 +1099,121 @@ function getComponentArgFromHtmlProp(
   if (variantGroup) {
     if (isStandaloneVariantGroup(variantGroup)) {
       if (value !== true) {
-        throw new Error(
-          `Component "${componentName}" prop "${propName}" is a standalone variant toggle and expects true, got ${JSON.stringify(
+        return fail(
+          `it is a standalone variant toggle and expects true, got ${JSON.stringify(
             value
           )}`
         );
       }
-      return [
-        param.variable.name,
+      return ok([
+        param,
         new VariantsRef({ variants: [variantGroup.variants[0]] }),
-      ];
+      ]);
     } else if (variantGroup.multi) {
       const values = isArray(value) ? value : [value];
-      const variants = values.map((v) => {
+      const variants: Variant[] = [];
+      for (const v of values) {
         const variant = variantGroup.variants.find(
           (vv) => toVarName(vv.name) === toVarName(`${v}`)
         );
         if (!variant) {
-          throw new Error(
-            `Component "${componentName}" prop "${propName}" has no variant matching "${v}"`
-          );
+          return fail(`no variant matching ${JSON.stringify(`${v}`)}`);
         }
-        return variant;
-      });
-      return [param.variable.name, new VariantsRef({ variants })];
+        variants.push(variant);
+      }
+      return ok([param, new VariantsRef({ variants })]);
     } else {
       const variant = variantGroup.variants.find(
         (v) => toVarName(v.name) === toVarName(`${value}`)
       );
       if (!variant) {
-        throw new Error(
-          `Component "${componentName}" prop "${propName}" has no variant matching "${value}"`
-        );
+        return fail(`no variant matching ${JSON.stringify(`${value}`)}`);
       }
-      return [param.variable.name, new VariantsRef({ variants: [variant] })];
+      return ok([param, new VariantsRef({ variants: [variant] })]);
     }
   }
 
-  if (isBoolType(param.type)) {
-    if (typeof value !== "boolean") {
-      throw new Error(
-        `Component "${componentName}" prop "${propName}" expects a boolean but got ${JSON.stringify(
+  // A string with `{{ jsExpr }}` is a dynamic data binding, valid for any
+  // (non-variant-group) param type regardless of its declared type.
+  if (typeof value === "string" && isDynamicValue(value)) {
+    return ok([param, interpolatedStringToExpr(value)]);
+  }
+
+  // Primitive-valued types (bool, num, text/img/href/target).
+  const tsType = wabToTsType(param.type);
+  if (tsType === "boolean" || tsType === "number" || tsType === "string") {
+    if (typeof value !== tsType) {
+      return fail(`expects a ${tsType} but got ${JSON.stringify(value)}`);
+    }
+    return ok([param, code(JSON.stringify(value))]);
+  }
+
+  if (isChoiceType(param.type)) {
+    const options = param.type.options.map((opt) =>
+      typeof opt === "object" ? opt.value : opt
+    );
+    if (!options.some((opt) => opt === value)) {
+      return fail(
+        `must be one of ${JSON.stringify(options)} but got ${JSON.stringify(
           value
         )}`
       );
     }
-
-    return [param.variable.name, code(JSON.stringify(value))];
+    return ok([param, code(JSON.stringify(value))]);
   }
 
-  if (isNumType(param.type)) {
-    if (typeof value !== "number") {
-      throw new Error(
-        `Component "${componentName}" prop "${propName}" expects a number but got ${JSON.stringify(
+  if (isMultiChoiceType(param.type)) {
+    const options = param.type.options.map((opt) =>
+      typeof opt === "object" ? opt.value : opt
+    );
+    if (!Array.isArray(value)) {
+      return fail(`expects an array but got ${JSON.stringify(value)}`);
+    }
+    const invalidValues = value.filter(
+      (v) => !options.some((opt) => opt === v)
+    );
+    if (invalidValues.length > 0) {
+      return fail(
+        `values must be from ${JSON.stringify(
+          options
+        )} but got invalid values: ${JSON.stringify(invalidValues)}`
+      );
+    }
+    return ok([param, code(JSON.stringify(value))]);
+  }
+
+  // dateString carries a single ISO date string.
+  if (isKnownDateString(param.type)) {
+    if (typeof value !== "string") {
+      return fail(`expects a date string but got ${JSON.stringify(value)}`);
+    }
+    return ok([param, code(JSON.stringify(value))]);
+  }
+
+  // dateRangeStrings carries a [from, to] pair of ISO date strings; either
+  // end may be null for an open range.
+  if (isKnownDateRangeStrings(param.type)) {
+    if (
+      !isArray(value) ||
+      value.length != 2 ||
+      value.some((v) => typeof v !== "string" && v !== null)
+    ) {
+      return fail(
+        `expects an array of [from, to] date strings but got ${JSON.stringify(
           value
         )}`
       );
     }
-    return [param.variable.name, code(JSON.stringify(value))];
+    return ok([param, codeLit(value as JsonValue)]);
   }
 
-  // Complex types (object/array/null/any-type) in customCode(JSON.stringify)
-  if (
-    isAnyType(param.type) ||
-    isArray(value) ||
-    isObject(value) ||
-    value === null
-  ) {
-    return [param.variable.name, customCode(JSON.stringify(value))];
+  // Untyped ('any') props accept arbitrary JSON (objects, arrays, null, and
+  // scalars). Stored as an unparenthesized code literal (codeLit), the same
+  // form the studio prop editor stores, so tryExtractJson can read it back
+  // when serializing the instance.
+  if (isAnyType(param.type)) {
+    return ok([param, codeLit(value as JsonValue)]);
   }
 
-  return [param.variable.name, code(JSON.stringify(value))];
+  return fail(`prop type "${param.type.name}" is not supported yet`);
 }

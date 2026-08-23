@@ -8,7 +8,6 @@ import {
   getReactWebBundle,
 } from "@/wab/client/components/studio/studio-bundles";
 import { fixStudioIframePositionAndOverflow } from "@/wab/client/dom-utils";
-import { IntercomProviderWrapper } from "@/wab/client/intercom";
 import { analytics } from "@/wab/client/observability";
 import RocketsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__RocketSvg";
 import { bindStudioShortcutHandlers } from "@/wab/client/shortcuts/studio/studio-shortcut-handlers";
@@ -16,6 +15,7 @@ import { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { TopProjectNavTour } from "@/wab/client/tours/TopProjectNavTour";
 import { StudioTutorialTours } from "@/wab/client/tours/tutorials/TutorialTours";
 import { mkShortId, spawn } from "@/wab/shared/common";
+import { PlasmicQueryDataProvider } from "@plasmicapp/query";
 import { notification } from "antd";
 import * as React from "react";
 
@@ -87,17 +87,19 @@ export class Studio extends React.Component<StudioProps, {}> {
   render() {
     return (
       <ShortcutsModal>
-        <BottomModalsProvider>
-          <IntercomProviderWrapper>
+        <PlasmicQueryDataProvider
+          provider={() => this.props.studioCtx.hostQuerySwrCache}
+        >
+          <BottomModalsProvider>
             <div className={"studio"}>
               <div className={"studio__main-area"}>{this.props.children}</div>
             </div>
-          </IntercomProviderWrapper>
-          <React.Suspense fallback={null}>
-            <TopProjectNavTour />
-            <StudioTutorialTours />
-          </React.Suspense>
-        </BottomModalsProvider>
+            <React.Suspense fallback={null}>
+              <TopProjectNavTour />
+              <StudioTutorialTours />
+            </React.Suspense>
+          </BottomModalsProvider>
+        </PlasmicQueryDataProvider>
       </ShortcutsModal>
     );
   }

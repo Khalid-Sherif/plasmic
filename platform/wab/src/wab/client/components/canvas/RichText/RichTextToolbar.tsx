@@ -1,7 +1,6 @@
 import { CustomCssProps } from "@/wab/client/components/canvas/CanvasText";
 import {
   marksForToolbar,
-  tags,
   TplTagElement,
 } from "@/wab/client/components/canvas/slate";
 import { SidebarModalProvider } from "@/wab/client/components/sidebar/SidebarModal";
@@ -18,7 +17,6 @@ import BoldsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIco
 import CodesvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__CodeSvg";
 import HeadingsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__HeadingSvg";
 import ItalicsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ItalicSvg";
-import LinksvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__LinkSvg";
 import OrderedListsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__OrderedListSvg";
 import SubscriptIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__Subscript";
 import SuperscriptIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__Superscript";
@@ -32,19 +30,41 @@ import {
 import { useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { EditingTextContext } from "@/wab/client/studio-ctx/view-ctx";
 import { fontWeightOptions } from "@/wab/client/typography-utils";
+import { INTERACT_OUTSIDE_EXCEPTION_SELECTORS } from "@/wab/commons/components/OnClickAway";
+import { mergeRefs } from "@/wab/commons/components/ReactUtil";
 import { PublicStyleSection } from "@/wab/shared/ApiSchema";
 import { spawn } from "@/wab/shared/common";
+import {
+  tagDisplayLabel,
+  TagName,
+  TextInlineTag,
+  textInlineTags,
+} from "@/wab/shared/html";
 import { canEditStyleSection } from "@/wab/shared/ui-config-utils";
 import { HTMLElementRefOf } from "@plasmicapp/react-web";
 import { Menu, Popover } from "antd";
 import { observer } from "mobx-react";
 import * as React from "react";
-import { Editor, Element, Range, Text } from "slate";
+import { Editor, Range, Element as SlateElement, Text } from "slate";
 
 type BlockElement = {
-  tag: (typeof tags)[number];
+  tag: TagName;
   icon: (props: any) => JSX.Element;
   label: string;
+};
+
+const INLINE_TAG_ICONS: Record<
+  Exclude<TextInlineTag, "a">,
+  (props: any) => JSX.Element
+> = {
+  code: CodesvgIcon,
+  span: TextsvgIcon,
+  strong: BoldsvgIcon,
+  b: BoldsvgIcon,
+  i: ItalicsvgIcon,
+  em: ItalicsvgIcon,
+  sub: SubscriptIcon,
+  sup: SuperscriptIcon,
 };
 
 const blocks: BlockElement[] = [
@@ -100,6 +120,15 @@ const blocks: BlockElement[] = [
   },
 ];
 
+// Clicks that don't end the editing session. Clicks on the edited text
+// itself never reach this document (the canvas is an iframe), so only
+// portaled popups and a few chrome widgets need exempting.
+const KEEP_EDITING_SELECTORS = [
+  ...INTERACT_OUTSIDE_EXCEPTION_SELECTORS,
+  // The link prompt's mask. Clicking away should not end the editing session.
+  ".ant-modal-root",
+].join(",");
+
 interface RichTextToolbarProps extends DefaultRichTextToolbarProps {
   ctx: EditingTextContext;
 }
@@ -127,9 +156,7 @@ function RichTextToolbar_(
   const textDecorationLine = marks["text-decoration-line"];
 
   // Current block tag (e.g. "h1", "ul" or undefined for no block).
-  const [block, setBlock] = React.useState<(typeof tags)[number] | undefined>(
-    undefined
-  );
+  const [block, setBlock] = React.useState<TagName | undefined>(undefined);
 
   const studioCtx = useStudioCtx();
   const resolver = useClientTokenResolver();
@@ -143,6 +170,26 @@ function RichTextToolbar_(
   const currentColor = maybeRealColor ?? "#000000";
 
   const [colorPickerVisible, setColorPickerVisible] = React.useState(false);
+
+  // End (and commit) the editing session on clicks in the studio chrome
+  // outside the toolbar.
+  const rootElt = React.useRef<HTMLDivElement | null>(null);
+  const rootRef = React.useMemo(() => mergeRefs(ref, rootElt), [ref]);
+  React.useEffect(() => {
+    const listener = (e: PointerEvent) => {
+      const target = e.target;
+      if (
+        e.button === 0 &&
+        target instanceof Element &&
+        !target.closest(KEEP_EDITING_SELECTORS) &&
+        !rootElt.current?.contains(target)
+      ) {
+        studioCtx.focusedViewCtx()?.tryBlurEditingText();
+      }
+    };
+    document.addEventListener("pointerdown", listener, true);
+    return () => document.removeEventListener("pointerdown", listener, true);
+  }, [studioCtx]);
 
   React.useEffect(() => {
     const { editor } = ctx;
@@ -165,7 +212,7 @@ function RichTextToolbar_(
     // Update current block.
     const blockElement = Editor.above(editor, {
       match: (n) =>
-        Element.isElement(n) &&
+        SlateElement.isElement(n) &&
         Editor.isBlock(editor, n) &&
         n.type === "TplTag" &&
         n.tag !== "li",
@@ -185,54 +232,20 @@ function RichTextToolbar_(
     }
   );
 
-  const inlineMenuItems = [
-    {
-      label: "Link",
-      action: "LINK",
-      icon: LinksvgIcon,
-    },
-    {
-      label: "Inline code",
-      action: "CODE",
-      icon: CodesvgIcon,
-    },
-    {
-      label: "Span element",
-      action: "SPAN",
-      icon: TextsvgIcon,
-    },
-    {
-      label: "Strong element",
-      action: "STRONG",
-      icon: BoldsvgIcon,
-    },
-    {
-      label: "Italic element",
-      action: "ITALIC_TAG",
-      icon: ItalicsvgIcon,
-    },
-    {
-      label: "Emphasis element",
-      action: "EMPHASIS",
-      icon: ItalicsvgIcon,
-    },
-    {
-      label: "Subscript element",
-      action: "SUBSCRIPT",
-      icon: SubscriptIcon,
-    },
-    {
-      label: "Superscript element",
-      action: "SUPERSCRIPT",
-      icon: SuperscriptIcon,
-    },
-  ].sort((a, b) => a.label.localeCompare(b.label));
+  const inlineMenuItems = textInlineTags
+    // "a" is handled by the dedicated Link button, which prompts for an href.
+    .filter((tag): tag is Exclude<TextInlineTag, "a"> => tag !== "a")
+    .map((tag) => ({
+      tag,
+      label: tagDisplayLabel(tag),
+      icon: INLINE_TAG_ICONS[tag],
+    }));
 
   return (
     <SidebarModalProvider>
       <PlasmicRichTextToolbar
         {...props}
-        root={{ ref }}
+        root={{ ref: rootRef }}
         style={{
           position: "absolute",
           top: studioCtx.focusedMode ? 60 : 12,
@@ -389,9 +402,9 @@ function RichTextToolbar_(
               <Menu>
                 {inlineMenuItems.map((item) => (
                   <Menu.Item
-                    key={item.action}
+                    key={item.tag}
                     aria-label={item.label}
-                    onClick={() => runInEditor(item.action)}
+                    onClick={() => runInEditor("WRAP_INLINE", item.tag)}
                   >
                     <Icon icon={item.icon} style={{ marginRight: 4 }} />
                     {item.label}

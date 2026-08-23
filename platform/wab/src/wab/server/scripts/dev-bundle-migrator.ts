@@ -32,6 +32,9 @@ const paths = [
   "src/wab/shared/codegen/__tests__/bundles/data-tokens-page-meta.json",
   "src/wab/shared/codegen/__tests__/bundles/global-variant-test.json",
   "src/wab/shared/codegen/__tests__/bundles/style-token-overrides.json",
+  "src/wab/shared/codegen/__tests__/bundles/animations-test.json",
+  "src/wab/shared/codegen/__tests__/bundles/imported-project-default-theme-styles.json",
+  "src/wab/shared/codegen/__tests__/bundles/linked-props.json",
   "src/wab/server/pkg-mgr/data/plume-master-pkg.json",
   "src/wab/server/pkg-mgr/data/plexus-master-pkg.json",
   "playwright/bundles/state-management.json",
@@ -78,7 +81,6 @@ const paths = [
   "../loader-tests/data/react-aria.json",
   "../loader-tests/data/strapi.json",
   "../loader-tests/data/wordpress.json",
-  "src/wab/client/copilot/tests/bundles/starter-project-desktop-first.json",
   "src/wab/shared/site-diffs/_tests_/bundles/code-components-with-same-name.json",
   "src/wab/shared/site-diffs/_tests_/bundles/rich-text-conflict.json",
   "src/wab/shared/site-diffs/_tests_/bundles/test-tpl-merge.json",
@@ -119,7 +121,7 @@ async function migrate() {
       !path.includes("/stale-bundle.json"),
       () =>
         `The stale bundle should not be migrated here. Please use
-          \`yarn db:upgrade-stale-bundle\``
+          \`pnpm db:upgrade-stale-bundle\``
     );
     logger().info(`Migrating ${path}`);
     // await execa.command(sh.quote`git checkout ${path}`, {

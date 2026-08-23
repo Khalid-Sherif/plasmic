@@ -11,6 +11,7 @@ Write something like this in `~/.plasmic/secrets.json`:
     "clientId": "SEE_GOOGLE_INSTRUCTIONS_BELOW",
     "clientSecret": "SEE_GOOGLE_INSTRUCTIONS_BELOW"
   },
+  "resendApiKey": "SET_THIS_TO_RESEND_API_KEY",
   "smtpAuth": {
     "user": "SET_THIS_TO_SMTP_USER",
     "pass": "SET_THIS_TO_SMTP_KEY"
@@ -21,8 +22,6 @@ Write something like this in `~/.plasmic/secrets.json`:
 
 You'll also need `~/.aws/credentials`, since various parts such as codegen/publish and Figma import use S3.
 
-Please use your given IAM credentials and access token.
-
 ## Database
 
 ### Setup DB
@@ -30,8 +29,8 @@ Please use your given IAM credentials and access token.
 On project root directory, make sure the Postgresql server is running, and run:
 
 ```
-yarn db:setup
-yarn db:reset # specify no_sudo=1 if `sudo -u postgres psql` doesn't work
+pnpm db:setup
+pnpm db:reset # specify no_sudo=1 if `sudo -u postgres psql` doesn't work
 ```
 
 ### Reset DB State
@@ -39,7 +38,7 @@ yarn db:reset # specify no_sudo=1 if `sudo -u postgres psql` doesn't work
 If you ever want to, you can reset the DB state by running (on project root):
 
 ```
-yarn db:reset # add --sudo if necessary (hopefully not)
+pnpm db:reset # specify no_sudo=1 if `sudo -u postgres psql` doesn't work
 ```
 
 > Important: remember clearing your browser cookies and restart any running servers.
@@ -48,7 +47,7 @@ yarn db:reset # add --sudo if necessary (hopefully not)
 
 ### Running Servers using screen
 
-Run all servers in screens:
+From `platform/wab`, run all servers in screens:
 
 ```
 bash tools/start.bash
@@ -92,19 +91,19 @@ In `wab` folder
 Run backend
 
 ```
-yarn backend
+pnpm backend
 ```
 
 Run frontend client dev server
 
 ```
-yarn start
+pnpm start
 ```
 
 Run host client, just a proxy on port 3005 to the frontend
 
 ```
-yarn host-server
+pnpm host-server
 ```
 
 ### Running Servers using pm2
@@ -117,10 +116,10 @@ workon wab
 . ~/.node/*/bin/activate
 ```
 
-Install pm2 globally so you can use pm2 rather than "yarn pm2"
+Install pm2 globally so you can use pm2 rather than "pnpm pm2"
 
 ```
-yarn global add pm2
+npm install -g pm2
 ```
 
 To start all processes, just
@@ -155,7 +154,7 @@ Refer to https://pm2.keymetrics.io/docs/usage/quick-start/ for more usage inform
 Whenever you fetch the latest changes, most of the time, you just need to run:
 
 ```
-yarn
+pnpm install
 make
 # restart node server
 # restart webpack, once in a blue moon
@@ -164,12 +163,12 @@ make
 But if something is still going wrong, try:
 
 ```
-yarn setup
+pnpm setup
 # restart node server
 # restart webpack, once in a blue moon
 ```
 
-If the above doesn't fix the issue, try again but running `yarn setup-all` instead.
+If the above doesn't fix the issue, try again but running `pnpm setup-all` instead.
 
 ## SVG Icons
 
@@ -181,7 +180,7 @@ To make sure your local database contains the latest version of the Plume
 package so that you can create components from Plume templates, run:
 
 ```
-yarn plume:dev update
+pnpm plume:dev update
 ```
 
 If you don't do so, studio may show a NotFoundError when you open any new
@@ -189,7 +188,7 @@ project.
 
 ## Testing
 
-Run Jest tests with:
+Run unit tests with:
 
 ```
 bash tools/test.bash
@@ -215,14 +214,12 @@ export function migrate(bundle: UnsafeBundle) {
 
 And that is!
 
-If you want to revert, simply remove the file (you can also go to gerrit and create a revert), and then restarting the app server. WARNING: this will occur in data loss. If you can create a new migration instead, do so!
+If you want to revert, simply remove the file and then restart the app server. WARNING: this will occur in data loss. If you can create a new migration instead, do so!
 
 In reality, you only have to worry about adding files and reverting files. Our deployment scripts will take care of the rest. Here's a brief explanation on how to do the changes in your local environment:
 
-- Migrating live: add a new migration and restart the server.
-- Reverting live: remove the migration and restart the server.
-- Migrating offline: add a new migration and run `yarn db:migrate-bundles`.
-- Reverting offline: remove the migration and run `yarn db:migrate-bundles`.
+- Migrating: add a new migration and restart the server.
+- Reverting: remove the migration and restart the server.
 
 ## Migrating dev/test bundles
 
@@ -231,12 +228,12 @@ We have some local JSON bundles for development/test purposes, which you also ne
 To migrate these, run:
 
 ```bash
-yarn migrate-dev-bundles
+pnpm migrate-dev-bundles
 ```
 
 This runs any necessary migrations according to the version stamp.
 
-Then make sure you run jest and update the test snapshots.
+Then make sure you run the tests and update the snapshots.
 
 NOTE: This will first do a `git checkout` on the file, resetting to a fresh checkout state! This lets you repeatedly test and run your migration script on the file.
 
@@ -249,8 +246,8 @@ In particular, the React Devtools Chrome extension will not work. However, you c
 Install and run `react-devtools`:
 
 ```bash
-    yarn global add react-devtools
-    react-devtool
+    npm install -g react-devtools
+    react-devtools
 ```
 
 Alternatively you can run it with npx:
@@ -275,52 +272,34 @@ We're opting to import all Ant styles wholesale and override their globals
 in antd-overrides.less. This allows for live theming (no dev server restarts
 necessary).
 
-Read more about Ant theming: https://paper.dropbox.com/doc/Web-Dev-Tips--AQguKQi_C8k0RX8XYqxhF3reAg-ohIiFVGa3PcjyBrm8zHew#:uid=860080543912951306384687&h2=Theming
-
 ## Maintaining dependencies
 
 Check what dependencies are not used (or missing):
 
 ```
-yarn custom-depcheck
+pnpm knip:deps
 ```
 
 Check what needs to be updated:
 
 ```
-yarn outdated
+pnpm outdated
 ```
 
 Update the dependencies:
 
 ```
-yarn upgrade --latest
+pnpm up --latest
 ```
 
 This will upgrade everything. You can also try selectively upgrading individual
-packages, but things get complicated with how yarn handles upgrading
-dependencies that are also indirect dependencies of other dependencies.
+packages, but things get complicated with upgrading dependencies that are
+also indirect dependencies of other dependencies.
 
 ## Alternate configs
 
 When pointing to a different DB, you currently have to make sure you locally
 edit ormconfig.json (used by typeorm CLI) and set the WAB_DBNAME env var.
-
-## Updating submodule repos
-
-To update submodule repos in place (rather than edit a separate checkout,
-commit, push, and pull here just to try out a change), follow these steps,
-taking wab/create-react-app-new/ as an example:
-
-- Ensure wab/create-react-app-new/ is on master, and not in detached HEAD. [More details].
-- Directly edit the submodule files in wab/create-react-app-new/.
-- Commit in the submodule repo.
-- Commit in the parent repo, so that the parent repo updates their tracking commit hash to the latest.
-- git-review the submodule.
-- Merge the submodule commit first.
-- Once the submodule commit is merged, git-review on the parent will work.
-
-[More details]: https://stackoverflow.com/questions/18770545/why-is-my-git-submodule-head-detached-from-master/55570998 for more on this.
 
 ## Audit licenses of dependencies
 
@@ -334,12 +313,12 @@ For Python dependencies, do this from each project directory:
 
 ## Production Build
 
-Run `yarn build` to build client app for production. This takes a long time (>5m).
+Run `pnpm build` to build client app for production. This takes a long time (>5m).
 
 You can test out your built artifact with:
 
 ```
-  yarn global add local-web-server
+  npm install -g local-web-server
   cd build/
   ws --spa index.html --rewrite '/api/(.*) -> http://localhost:3004/api/$1'
 ```

@@ -1,5 +1,6 @@
 import { cleanPlainText, plainTextToReact } from "@/wab/shared/codegen/util";
-import { getCssRulesFromRs } from "@/wab/shared/css";
+import { fontWeightNumber, getCssRulesFromRs } from "@/wab/shared/css";
+import { isTagInline } from "@/wab/shared/html";
 import {
   isKnownTplTag,
   type Marker,
@@ -11,6 +12,11 @@ import {
 import "@/wab/client/components/canvas/slate";
 import L from "lodash";
 import type { MakeADT } from "ts-adt/MakeADT";
+
+// nodeMarkerText is the string that replaces NodeMarkers in RawText.text.
+// This value is used, for example, in tpl-tree, i.e. a text like `This is a
+// <a href="...">link</a>` will be seen as `This is a {nodeMarkerText}` there.
+export const nodeMarkerText = "[child]";
 
 export type NormalizedMarker = {
   position: number;
@@ -77,41 +83,6 @@ export function normalizeMarkers(
     });
   }
   return newMarkers;
-}
-
-export const textInlineTags = [
-  "a",
-  "code",
-  "span",
-  "strong",
-  "i",
-  "em",
-  "sub",
-  "sup",
-];
-export const textBlockTags = [
-  "blockquote",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "pre",
-];
-export const listContainerTags = ["ol", "ul"];
-
-/**
- * This function is used in several places to decide whether a TplTag
- * inside a rich-text block should be inline or not. It decides that
- * based in the tag (e.g. "span" is inline, while "div" isn't).
- */
-export function isTagInline(tag: string) {
-  return textInlineTags.includes(tag);
-}
-
-export function isTagListContainer(tag: string) {
-  return listContainerTags.includes(tag);
 }
 
 export interface RichTextRenderTarget<T> {
@@ -184,7 +155,9 @@ export function renderRichTextChildren<T>(
     if (marker.type === "styleMarker") {
       const cssRules: Record<string, any> = getCssRulesFromRs(marker.rs, true);
       if ("fontWeight" in cssRules) {
-        cssRules["fontWeight"] = parseInt(cssRules["fontWeight"]);
+        cssRules["fontWeight"] = fontWeightNumber(
+          String(cssRules["fontWeight"])
+        );
       }
       if (L.isEmpty(cssRules)) {
         children.push(target.text(textPart, `t-${i}`));

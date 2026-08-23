@@ -1,5 +1,12 @@
 {
-  "version": "1.0.84",
+  "version": "1.0.87",
+  "description": "Watch a Plasmic project for changes over socket.io and trigger live updates during development.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "packages/watcher"
+  },
   "license": "MIT",
   "sideEffects": false,
   "types": "./dist/index.d.ts",
@@ -19,10 +26,10 @@
     "node": ">=10"
   },
   "scripts": {
-    "build": "yarn build:types && yarn build:index",
-    "build:types": "yarn tsc",
+    "build": "pnpm build:types && pnpm build:index",
+    "build:types": "tsc",
     "build:index": "node ../../build.mjs ./src/index.ts",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
     "lint": "eslint",
     "prepublishOnly": "npm run build",
     "postpublish": "bash ../../scripts/publish-api-doc-model.sh",

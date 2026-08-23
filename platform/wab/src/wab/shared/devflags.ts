@@ -162,6 +162,8 @@ export interface HostLessPackageInfo {
   codeLink?: string;
   projectId: string | string[];
   items: HostLessComponentInfo[];
+  components?: PreInstallComponentInfo[];
+  functions?: PreInstallFunctionInfo[];
   hidden?: boolean;
   showInstall?: boolean;
   whitelistDomains?: string[];
@@ -169,6 +171,16 @@ export interface HostLessPackageInfo {
   isInstallOnly?: boolean;
   imageUrl?: string;
   onlyShownIn?: "old" | "new";
+  /**
+   * Groups multiple packages into a single Insert Panel entry post-install.
+   * Pre-install, only members flagged with `isPrimaryItemOfBundle: true`
+   * render as tiles in the component store — flag one for a single tile
+   * (Strapi/Wordpress/CMS pattern) or flag several to surface each member
+   * independently (e.g. APIs surfaces both Fetch and GraphQL).
+   */
+  bundleName?: string;
+  /** Marks this package as a primary representative of its `bundleName`. */
+  isPrimaryItemOfBundle?: boolean;
 }
 
 export interface HostLessComponentInfo {
@@ -187,6 +199,26 @@ export interface HostLessComponentInfo {
   onlyShownIn?: "old" | "new";
   requiredHostVersion?: number;
   args?: { [prop: string]: any };
+}
+
+/**
+ * Info for a component listed in a package's pre-install preview.
+ */
+export interface PreInstallComponentInfo {
+  componentName: string;
+  displayName: string;
+  description?: string;
+  isRoot?: boolean;
+}
+
+/**
+ * Info for a query function listed in a package's pre-install preview.
+ */
+export interface PreInstallFunctionInfo {
+  /** Must match `customFunctionId` (i.e. `namespace.importName`) */
+  functionId: string;
+  displayName: string;
+  description?: string;
 }
 
 type InsertableByTypeString<T extends InsertableTemplatesSelectable["type"]> =
@@ -397,7 +429,6 @@ const DEFAULT_DEVFLAGS = {
   introYoutubeId: "K_YzFBd7b2I",
   noFlipTags: true,
   revisionNum: undefined,
-  richtext2: true,
   secretApiTokenTeams: ["teamId"],
   selectInserted: true,
   showFullPreviewWarning: true,
@@ -412,16 +443,19 @@ const DEFAULT_DEVFLAGS = {
   enableUiCopilot: false,
   enableChatCopilot: false,
   uiCopilotModelProviderOpts: {
-    provider: "OpenAI",
-    modelName: "gpt-4.1",
+    provider: "VertexAnthropic",
+    modelName: "claude-haiku-4-5",
     maxTokens: 32000,
-    temperature: 0,
   } as ModelProviderOpts,
   chatCopilotModelProviderOpts: {
-    provider: "Anthropic",
-    modelName: "claude-sonnet-4-20250514",
+    provider: "VertexAnthropic",
+    modelName: "claude-sonnet-5",
     maxTokens: 32000,
-    temperature: 0,
+  } as ModelProviderOpts,
+  phishingCheckModelProviderOpts: {
+    provider: "Google",
+    modelName: "gemini-2.5-flash-lite",
+    maxTokens: 10000,
   } as ModelProviderOpts,
 
   hostLessWorkspaceId: undefined as WorkspaceId | undefined,
@@ -435,7 +469,6 @@ const DEFAULT_DEVFLAGS = {
 
   // Disabled by default
   posthog: true,
-  copilotTab: false,
   copilotClaude: false,
   codePreview: false,
   demo: false,
@@ -446,7 +479,6 @@ const DEFAULT_DEVFLAGS = {
   importedTokenOverrides: false,
   insert2022Q4: true,
   sso: false,
-  omnibar: false,
   paywalls: false,
   showIntroSplash: false,
   skipInvariants: false,
@@ -558,6 +590,10 @@ const DEFAULT_DEVFLAGS = {
   // List of email domains that are forbidden from creating new accounts.
   // Existing users from these domains can still log in; this only blocks signup.
   blockedSignupDomains: [] as string[],
+
+  recaptchaSiteKey: "",
+  recaptchaMinScore: 0.5,
+  recaptchaEnforce: false,
 
   newProjectModal: false,
 

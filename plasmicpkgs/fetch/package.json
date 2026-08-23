@@ -1,7 +1,9 @@
 {
   "name": "@plasmicpkgs/fetch",
-  "version": "0.0.39",
-  "description": "Plasmic registration call for fetch function",
+  "version": "0.0.52",
+  "description": "Custom function for making HTTP requests from Plasmic data queries.",
+  "homepage": "https://www.plasmic.app",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/plasmicapp/plasmic.git",
@@ -24,15 +26,15 @@
     "dist"
   ],
   "scripts": {
-    "build": "yarn build:types && yarn build:index",
-    "build:types": "yarn tsc",
+    "build": "pnpm build:types && pnpm build:index",
+    "build:types": "tsc",
     "build:index": "node ../../build.mjs ./src/index.ts",
     "prepublishOnly": "npm run build",
     "postpublish": "bash ../../scripts/publish-api-doc-model.sh"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "typescript": "^5.7.3"
+    "@plasmicapp/host": "2.0.17",
+    "typescript": "^5.2.2"
   },
   "peerDependencies": {
     "@plasmicapp/host": ">=1.0.211"

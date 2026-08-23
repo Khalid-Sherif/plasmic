@@ -74,7 +74,6 @@ import {
   isCodeComponentTpl,
   isPageComponent,
 } from "@/wab/shared/core/components";
-import { isTagListContainer } from "@/wab/shared/core/rich-text-util";
 import {
   isBackgroundValidForTpl,
   isListStyleValidForTpl,
@@ -110,6 +109,7 @@ import {
 import { ValComponent } from "@/wab/shared/core/val-nodes";
 import { DevFlagsType } from "@/wab/shared/devflags";
 import { isGridTag } from "@/wab/shared/grid-utils";
+import { isTagListContainer } from "@/wab/shared/html";
 import {
   TplComponent,
   TplNode,
@@ -349,7 +349,7 @@ const htmlTagsWithAttributes = new Set([
   "input",
 ]);
 
-export function getRenderBySection(
+function getRenderBySection(
   tpl: TplNode,
   viewCtx: ViewCtx,
   renderOpts: Map<Section, boolean>
@@ -574,10 +574,7 @@ export function getRenderBySection(
     [
       Section.PositioningPanel,
       () =>
-        isPositioningValidForTpl(
-          tpl,
-          viewCtx.variantTplMgr().ensureCurrentVariantSetting(tpl)
-        ) &&
+        isPositioningValidForTpl(tpl, expsProvider.mergedExp()) &&
         showSection(Section.PositioningPanel) && (
           <PositioningPanelSection
             key={`${tpl.uuid}-positioning`}

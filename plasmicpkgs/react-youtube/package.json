@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/react-youtube",
-  "version": "7.13.251",
+  "version": "7.13.264",
   "description": "Plasmic registration call for react-youtube",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/react-youtube"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/react-youtube.esm.js",
@@ -21,15 +28,15 @@
   "scripts": {
     "build": "tsdx build",
     "start": "tsdx watch",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test --passWithNoTests",
+    "test": "TEST_CWD=`pwd` pnpm -w test --passWithNoTests",
     "lint": "tsdx lint",
     "prepublishOnly": "npm run build",
     "size": "size-limit",
     "analyze": "size-limit --why"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "@types/node": "^14.0.26",
+    "@plasmicapp/host": "2.0.17",
+    "@types/node": "^14.18.63",
     "@types/react": "^18",
     "@types/youtube-player": "^5.5.6",
     "tsdx": "^0.14.1",

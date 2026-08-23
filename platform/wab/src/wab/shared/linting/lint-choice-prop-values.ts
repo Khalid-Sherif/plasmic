@@ -19,8 +19,9 @@ import {
   Site,
   TplNode,
 } from "@/wab/shared/model/classes";
+import { isOptionsType } from "@/wab/shared/model/model-util";
 import { ChoiceObject, ChoiceOptions } from "@plasmicapp/host";
-import { isNumber, isObject, isString } from "lodash";
+import { isBoolean, isNumber, isObject, isString } from "lodash";
 
 const TYPE = "choice-prop-values";
 
@@ -52,7 +53,7 @@ export const valueInOptions = (
     return value.every((val) => valueInOptions(options, val));
   }
   return !!options?.some((option) =>
-    isString(option) || isNumber(option)
+    isString(option) || isNumber(option) || isBoolean(option)
       ? option === value
       : isObject(option) && "value" in option
       ? option.value === value
@@ -98,7 +99,7 @@ const lintComponent = maybeComputedFn(
       }
       for (const vs of tpl.vsettings) {
         for (const arg of vs.args) {
-          if (arg.param.type.name !== "choice") {
+          if (!isOptionsType(arg.param.type)) {
             continue;
           }
           const propType = inferPropTypeFromParam(

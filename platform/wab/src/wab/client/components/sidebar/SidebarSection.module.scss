@@ -2,6 +2,7 @@
 @import "../../../styles/_vars";
 
 .root {
+  position: relative;
   width: 100%;
 }
 
@@ -95,7 +96,7 @@
   cursor: pointer;
 
   &:hover {
-    color: $neutral-primary;
+    color: $sand12;
   }
 }
 

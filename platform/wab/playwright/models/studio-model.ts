@@ -475,14 +475,18 @@ export class StudioModel extends BaseModel {
     });
   }
 
+  /**
+   * Renames the focused element via ctrl+R shortcut, which opens an inline rename
+   * textbox on the canvas selection tag. Waits for the textbox to appear/disappear
+   * so a swallowed shortcut fails here.
+   */
   async renameTreeNode(name: string) {
-    await this.page.waitForTimeout(200);
     await this.page.keyboard.press("ControlOrMeta+r");
-    await this.page.waitForTimeout(200);
-    await this.page.keyboard.type(name);
-    await this.page.waitForTimeout(200);
-    await this.page.keyboard.press("Enter");
-    await this.page.waitForTimeout(200);
+    const renameInput = this.frame.locator(".node-outline-tag input");
+    await renameInput.waitFor({ state: "visible" });
+    await renameInput.fill(name);
+    await renameInput.press("Enter");
+    await renameInput.waitFor({ state: "hidden" });
   }
 
   async convertToSlot(slotName?: string) {
@@ -547,20 +551,22 @@ export class StudioModel extends BaseModel {
   async openComponentInNewFrame(
     componentName: string,
     options: {
+      /**
+       * When true, opens the component via "Edit in new artboard".
+       * When false, opens via "Edit component" in the component's own arena.
+       */
       editInNewArtboard: boolean;
-    } = { editInNewArtboard: false }
+    } = { editInNewArtboard: true }
   ) {
     await this.leftPanel.switchToComponentsTab();
     const componentItem = this.componentListItem.filter({
       hasText: componentName,
     });
     await componentItem.click({ button: "right" });
-    if (options) {
-      if (options.editInNewArtboard) {
-        await this.editComponentButton.click();
-      } else {
-        await this.editComponentInNewArtboardButton.click();
-      }
+    if (options.editInNewArtboard) {
+      await this.editComponentInNewArtboardButton.click();
+    } else {
+      await this.editComponentButton.click();
     }
   }
 
@@ -789,8 +795,8 @@ export class StudioModel extends BaseModel {
     await this.page.keyboard.press("Enter");
   }
 
-  async removeDomainCard() {
-    await this.domainCard.locator("..").getByText("Remove").click();
+  async dismissDomainCard() {
+    await this.domainCard.getByText("Dismiss").click();
   }
 
   async focusCreatedFrameRoot() {
@@ -956,7 +962,12 @@ export class StudioModel extends BaseModel {
   }
 
   async createNewComponent(name: string) {
+    const framesBefore = await this.frames.count();
     await this.leftPanel.addComponent(name);
+    // The new component's artboard mounts asynchronously after the naming
+    // modal closes; wait for it so createNewFrame doesn't race its own
+    // before/after frame count against it.
+    await expect(this.frames).toHaveCount(framesBefore + 1);
     const frame = await this.createNewFrame();
     await waitForFrameToLoad(this.page);
     return frame;

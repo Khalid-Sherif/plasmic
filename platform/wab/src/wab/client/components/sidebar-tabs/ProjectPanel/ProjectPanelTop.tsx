@@ -1,5 +1,4 @@
 import { apiKey } from "@/wab/client/api";
-import { parseRoute } from "@/wab/client/cli-routes";
 import { menuSection } from "@/wab/client/components/menu-builder";
 import {
   reactConfirm,
@@ -10,9 +9,9 @@ import styles from "@/wab/client/components/sidebar-tabs/ProjectPanel/ProjectPan
 import { Matcher } from "@/wab/client/components/view-common";
 import { Spinner } from "@/wab/client/components/widgets";
 import { useTopFrameApi } from "@/wab/client/contexts/AppContexts";
-import { DefaultFolderItemProps } from "@/wab/client/plasmic/project_panel/PlasmicFolderItem";
-import PlasmicProjectPanel from "@/wab/client/plasmic/project_panel/PlasmicProjectPanel";
-import PlasmicSearchInput from "@/wab/client/plasmic/project_panel/PlasmicSearchInput";
+import { DefaultFolderItemProps } from "@/wab/client/plasmic/plasmic_kit_project_panel/PlasmicFolderItem";
+import PlasmicNavigationDropdown from "@/wab/client/plasmic/plasmic_kit_project_panel/PlasmicNavigationDropdown";
+import PlasmicSearchInput from "@/wab/client/plasmic/plasmic_kit_project_panel/PlasmicSearchInput";
 import {
   StudioCtx,
   calculateNextVersionKey,
@@ -284,7 +283,7 @@ function BranchPanelTop_(
 
   return (
     <div className={styles.root} ref={outerRef} {...testIds.projectPanel}>
-      <PlasmicProjectPanel
+      <PlasmicNavigationDropdown
         style={{ zIndex: 0 }}
         plusButton={{
           props: {
@@ -369,8 +368,7 @@ function BranchPanelTop_(
               dismissSearch();
               if (
                 studioCtx.isLiveMode &&
-                parseRoute(
-                  APP_ROUTES.projectPreview,
+                APP_ROUTES.projectPreview.parse(
                   studioCtx.appCtx.history.location.pathname
                 )
               ) {
@@ -445,7 +443,7 @@ function BranchPanelTop_(
             );
           }}
         </FixedSizeList>
-      </PlasmicProjectPanel>
+      </PlasmicNavigationDropdown>
     </div>
   );
 }

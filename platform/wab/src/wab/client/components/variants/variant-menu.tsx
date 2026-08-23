@@ -1,6 +1,5 @@
 import { MenuBuilder } from "@/wab/client/components/menu-builder";
 import DataPicker from "@/wab/client/components/sidebar-tabs/DataBinding/DataPicker";
-import { getExpectedValuesForVariantGroup } from "@/wab/client/components/sidebar-tabs/DataBinding/DataPickerUtil";
 import { ClickStopper } from "@/wab/client/components/widgets";
 import { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { zIndex } from "@/wab/client/z-index";
@@ -10,6 +9,7 @@ import {
 } from "@/wab/shared/Labels";
 import {
   getBaseVariant,
+  getExpectedValuesForVariantGroup,
   isBaseVariant,
   isCodeComponentVariant,
   isPrivateStyleVariant,
@@ -42,6 +42,7 @@ import {
   isKnownObjectPath,
 } from "@/wab/shared/model/classes";
 import { Menu, Popover } from "antd";
+import { ok } from "neverthrow";
 import React from "react";
 
 export function makeVariantMenu(opts: {
@@ -433,9 +434,11 @@ export function VariantDataPicker(props: {
                 new CustomCode({ code: "undefined", fallback: undefined })
               );
               spawn(
-                studioCtx.change(({ success }) => {
-                  group.linkedState.param.defaultExpr = newExpr;
-                  return success();
+                studioCtx.change(() => {
+                  studioCtx.siteOps().updateState(group.linkedState, {
+                    initialValue: newExpr,
+                  });
+                  return ok();
                 })
               );
 
@@ -448,9 +451,11 @@ export function VariantDataPicker(props: {
                 group.linkedState.param.defaultExpr.path[0] === "undefined"
               ) {
                 spawn(
-                  studioCtx.change(({ success }) => {
-                    group.linkedState.param.defaultExpr = null;
-                    return success();
+                  studioCtx.change(() => {
+                    studioCtx.siteOps().updateState(group.linkedState, {
+                      initialValue: null,
+                    });
+                    return ok();
                   })
                 );
               }

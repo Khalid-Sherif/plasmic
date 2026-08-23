@@ -49,6 +49,7 @@ import { canRead, canWrite } from "@/wab/shared/ui-config-utils";
 import { Menu } from "antd";
 import { last } from "lodash";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 import { DraggableProvidedDragHandleProps } from "react-beautiful-dnd";
 
@@ -182,7 +183,10 @@ export const ImageAssetsPanel = observer(function ImageAssetsPanel() {
           const selectedAssets = studioCtx.site.imageAssets.filter((asset) => {
             return selectedAssetsIds.has(asset.uuid);
           });
-          return await studioCtx.siteOps().tryDeleteImageAssets(selectedAssets);
+          const result = await studioCtx
+            .siteOps()
+            .tryDeleteImageAssets(selectedAssets);
+          return result.isOk() && result.value.deletedResources.length > 0;
         }}
       >
         <VirtualGroupedList
@@ -458,7 +462,7 @@ export const ImageAssetSidebarPopup = observer(
       if (!imageResult || !opts) {
         return;
       }
-      return studioCtx.change(({ success }) => {
+      return studioCtx.change(() => {
         studioCtx.siteOps().updateImageAsset(asset, imageResult);
         if (
           file &&
@@ -466,7 +470,7 @@ export const ImageAssetSidebarPopup = observer(
         ) {
           studioCtx.tplMgr().renameImageAsset(asset, file.name);
         }
-        return success();
+        return ok();
       });
     };
 

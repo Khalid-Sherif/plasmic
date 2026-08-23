@@ -9,15 +9,15 @@
   height: 52px;
   column-gap: 4px;
   min-width: 0;
-  padding: 8px 8px 8px 16px;
+  padding: 8px 16px;
 }
 .rootisSelected {
   background: var(--token-dqEx_KxIoYV);
 }
-.root:hover {
+.root:hover:hover {
   background: var(--token-bV4cCeIniS6);
 }
-.rootisSelected:hover {
+.rootisSelected:hover:hover {
   background: var(--token-RhvOnhv_xIi);
 }
 .freeBox__qdAAo {
@@ -27,46 +27,12 @@
   column-gap: 4px;
   min-width: 0;
 }
-.dataPickerValueTypeIcon:global(.__wab_instance) {
-  position: relative;
+.icon {
+  object-fit: cover;
+  width: 16px;
+  height: 16px;
+  color: var(--token-fVn5vRhXJxQ);
   flex-shrink: 0;
-}
-.dataPickerValueTypeIconstep_notPlayed:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_string:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_number:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_boolean:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_object:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_array:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_undefined:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconvariableType_func:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.dataPickerValueTypeIconisSelected:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.root:hover .dataPickerValueTypeIcon:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.rootisSelected:hover
-  .dataPickerValueTypeIconisSelected:global(.__wab_instance) {
-  flex-shrink: 0;
-}
-.textstep_notPlayed {
-  margin-right: 0px;
 }
 .freeBox___2XUqB {
   display: flex;
@@ -147,39 +113,101 @@
 .previewValueisSelected_variableType_func {
   color: var(--token-VUsIDivgUss);
 }
-.svg {
+.freeBox__luqpj {
+  display: flex;
+  flex-direction: row;
   position: relative;
-  object-fit: cover;
-  width: 16px;
-  height: 16px;
-  margin-right: -6px;
-  color: var(--token-fVn5vRhXJxQ);
-  flex-shrink: 0;
+  align-items: stretch;
+  justify-content: flex-start;
+  margin-right: -16px;
 }
-.svgvariableType_object {
-  display: block;
-}
-.svgvariableType_array {
-  display: block;
-}
-.svgisSelected {
-  color: var(--token-D666zt2IZPL);
-}
-.play {
-  position: relative;
-  object-fit: cover;
-  max-width: 100%;
-  width: 20px;
-  height: 20px;
-  color: var(--token-fAL2XzoILGPm);
-  cursor: pointer;
+.link:global(.__wab_instance) {
   flex-shrink: 0;
   display: none;
 }
-.playstep_notPlayed {
-  display: block;
+.linkvariableType_object:global(.__wab_instance) {
+  flex-shrink: 0;
 }
-.playstep_played {
-  color: var(--token-N3uwCfNqv);
-  display: block;
+.linkhasLink:global(.__wab_instance) {
+  flex-shrink: 0;
+}
+.root:hover .link:global(.__wab_instance) {
+  flex-shrink: 0;
+}
+.rootvariableType_object:hover
+  .linkvariableType_object:global(.__wab_instance) {
+  flex-shrink: 0;
+}
+.roothasLink:hover .linkhasLink:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: flex;
+}
+.svg__i9Yw {
+  object-fit: cover;
+  width: 16px;
+  height: 16px;
+}
+.svg__fqfmK {
+  display: flex;
+  position: relative;
+  object-fit: cover;
+  height: 1em;
+}
+.play:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: none;
+}
+.playstep_notPlayed:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: flex;
+}
+.playstep_played:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: flex;
+}
+.playstep_notPlayed_variableType_number:global(.__wab_instance) {
+  flex-shrink: 0;
+}
+.svg__gIs5H {
+  position: relative;
+  object-fit: cover;
+  color: var(--token-fAL2XzoILGPm);
+  width: 16px;
+  height: 16px;
+}
+.svgstep_played__gIs5HvLpb6 {
+  color: var(--token-D666zt2IZPL);
+}
+.svg__n3XOl {
+  display: flex;
+  position: relative;
+  height: 1em;
+}
+.iconButton:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: none;
+}
+.iconButtonvariableType_object:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: flex;
+}
+.iconButtonvariableType_array:global(.__wab_instance) {
+  flex-shrink: 0;
+  display: flex;
+}
+.svg__rIbNe {
+  position: relative;
+  object-fit: cover;
+  color: var(--token-fVn5vRhXJxQ);
+  width: 16px;
+  height: 16px;
+}
+.svgisSelected__rIbNeUtDu {
+  color: var(--token-D666zt2IZPL);
+}
+.svg___26Gky {
+  display: flex;
+  position: relative;
+  object-fit: cover;
+  height: 1em;
 }

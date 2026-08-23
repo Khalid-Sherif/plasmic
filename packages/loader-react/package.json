@@ -1,7 +1,8 @@
 {
   "name": "@plasmicapp/loader-react",
-  "version": "2.0.6",
+  "version": "2.0.20",
   "description": "Plasmic loader SDK for React",
+  "homepage": "https://www.plasmic.app",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -42,16 +43,16 @@
     "react-server-conditional.d.ts"
   ],
   "engines": {
-    "node": ">=12"
+    "node": ">=18"
   },
   "scripts": {
-    "build": "yarn build:types && yarn build:index && yarn build:react-server",
-    "build:types": "yarn tsc",
+    "build": "pnpm build:types && pnpm build:index && pnpm build:react-server",
+    "build:types": "tsc",
     "build:index": "node ../../build.mjs ./src/index.ts --use-client",
     "build:react-server": "node ../../build.mjs ./src/react-server.ts",
     "yalcp": "yalc publish --push",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test",
-    "coverage": "TEST_CWD=`pwd` yarn --cwd=../.. test --coverage --passWithNoTests",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "lint": "eslint",
     "prepublishOnly": "npm run build",
     "postpublish": "bash ../../scripts/publish-api-doc-model.sh",
@@ -59,13 +60,13 @@
     "analyze": "size-limit --why"
   },
   "dependencies": {
-    "@plasmicapp/data-sources-context": "0.1.23",
-    "@plasmicapp/host": "2.0.4",
-    "@plasmicapp/loader-core": "2.0.0",
-    "@plasmicapp/loader-fetcher": "2.0.0",
-    "@plasmicapp/loader-splits": "1.0.70",
-    "@plasmicapp/prepass": "1.0.24",
-    "@plasmicapp/query": "0.1.84",
+    "@plasmicapp/data-sources-context": "0.1.25",
+    "@plasmicapp/host": "2.0.17",
+    "@plasmicapp/loader-core": "2.0.5",
+    "@plasmicapp/loader-fetcher": "2.0.5",
+    "@plasmicapp/loader-splits": "1.0.76",
+    "@plasmicapp/prepass": "1.0.28",
+    "@plasmicapp/query": "0.1.87",
     "pascalcase": "^1.0.0",
     "server-only": "0.0.1"
   },
@@ -74,8 +75,11 @@
     "@types/pascalcase": "^1.0.3",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitest/coverage-v8": "4.1.10",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

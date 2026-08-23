@@ -14,6 +14,9 @@ import { LabelWithDetailedTooltip } from "@/wab/client/components/widgets/LabelW
 import { LabeledListItem } from "@/wab/client/components/widgets/LabeledListItem";
 import PlusIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Plus";
 import { useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import { UiActionsOverlay } from "@/wab/client/studio-ctx/ui/studio-ui-actions";
+import { mkSectionUiId } from "@/wab/client/studio-ctx/ui/studio-ui-ids";
+import { valueAsString } from "@/wab/commons/values";
 import {
   ensure,
   maybe,
@@ -21,7 +24,6 @@ import {
   swallow,
   unexpected,
 } from "@/wab/shared/common";
-import { valueAsString } from "@/wab/commons/values";
 import { extractParamsFromPagePath } from "@/wab/shared/core/components";
 import {
   getSingleDynExprFromTemplatedString,
@@ -41,6 +43,7 @@ import {
 import { Input, InputRef, Menu, Popover, Tooltip } from "antd";
 import { isEqual, size } from "lodash";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React, { useMemo, useState } from "react";
 
 export type URLParamType = "Path" | "Query" | "Fragment";
@@ -173,18 +176,18 @@ export const PageURLParametersSection = observer(
     const hasAnyParam = pathParams.length + urlSearchParams.length > 0;
 
     const onAdd = async (key: string) => {
-      await sc.change(({ success }) => {
+      await sc.change(() => {
         pageMeta.query[key] = "REPLACEME";
-        return success();
+        return ok();
       });
     };
 
     const handleValueChange = React.useCallback(
       (source: { [key: string]: string }) =>
         (key: string, newValue: string) => {
-          void sc.change(({ success }) => {
+          void sc.change(() => {
             source[key] = newValue;
-            return success();
+            return ok();
           });
         },
       []
@@ -192,9 +195,9 @@ export const PageURLParametersSection = observer(
 
     const handleParamDeletion = React.useCallback(
       (source: { [key: string]: string }) => (key: string) => {
-        void sc.change(({ success }) => {
+        void sc.change(() => {
           delete source[key];
-          return success();
+          return ok();
         });
       },
       []
@@ -380,6 +383,7 @@ export const PageURLParametersSection = observer(
             />
           ))}
         </div>
+        <UiActionsOverlay uiId={mkSectionUiId("PageMetaUrlParams")} />
       </SidebarSection>
     );
   }

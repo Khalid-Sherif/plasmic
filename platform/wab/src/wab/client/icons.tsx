@@ -1,4 +1,4 @@
-import { Icon } from "@/wab/client/components/widgets/Icon";
+import { Icon, SvgIcon } from "@/wab/client/components/widgets/Icon";
 import AreaInputIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__AreaInput";
 import ArrowBottomIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__ArrowBottom";
 import ArrowLeftIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__ArrowLeft";
@@ -15,8 +15,8 @@ import EyeClosedIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__EyeClos
 import FetchIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Fetch";
 import FrameIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Frame";
 import GridIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Grid";
-import HeadingIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Heading";
 import HStackBlockIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__HStackBlock";
+import HeadingIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Heading";
 import ImageBlockIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__ImageBlock";
 import LinkIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Link";
 import PassInputIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__PassInput";
@@ -27,17 +27,25 @@ import TokenIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Token";
 import TriangleBottomIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__TriangleBottom";
 import TriangleRightIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__TriangleRight";
 import VStackBlockIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__VStackBlock";
-import EyeNoneIcon from "@/wab/client/plasmic/plasmic_kit_design_system/icons/PlasmicIcon__EyeNone";
-import PageIcon from "@/wab/client/plasmic/plasmic_kit_design_system/icons/PlasmicIcon__Page";
 import BlockIcon from "@/wab/client/plasmic/plasmic_kit_design_system/PlasmicIcon__Block";
 import CombinationIcon from "@/wab/client/plasmic/plasmic_kit_design_system/PlasmicIcon__Combination";
 import GroupIcon from "@/wab/client/plasmic/plasmic_kit_design_system/PlasmicIcon__Group";
 import TextInputIcon from "@/wab/client/plasmic/plasmic_kit_design_system/PlasmicIcon__TextInput";
+import EyeNoneIcon from "@/wab/client/plasmic/plasmic_kit_design_system/icons/PlasmicIcon__EyeNone";
+import PageIcon from "@/wab/client/plasmic/plasmic_kit_design_system/icons/PlasmicIcon__Page";
+import BracesIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__Braces";
 import ChevronDownsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ChevronDownSvg";
 import ChevronLeftsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ChevronLeftSvg";
 import ChevronRightsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ChevronRightSvg";
 import ChevronUpsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__ChevronUpSvg";
+import DatabaseSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__DatabaseSvg";
+import DownloadsvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__DownloadSvg";
+import FunctionSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__FunctionSvg";
+import InputFieldSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__InputFieldSvg";
+import LinkSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__LinkSvg";
+import SettingsSlidersSvgIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__SettingsSlidersSvg";
 import TableRowsPageSectionIcon from "@/wab/client/plasmic/plasmic_kit_icons/icons/PlasmicIcon__TableRowsPageSection";
+import type { TplType } from "@/wab/shared/core/tpls";
 import { TplVisibility } from "@/wab/shared/visibility-utils";
 import React from "react";
 import { MdError } from "react-icons/md";
@@ -63,6 +71,7 @@ export const EXPANDER_EXPANDED_ICON = <Icon icon={TriangleBottomIcon} />;
 export const EXPANDER_COLLAPSED_ICON = <Icon icon={TriangleRightIcon} />;
 export const GROUP_ICON = <Icon icon={GroupIcon} />;
 export const COMBINATION_ICON = <Icon icon={CombinationIcon} />;
+export const FUNCTION_ICON = <Icon icon={FunctionSvgIcon} />;
 export const TOKEN_ICON = <Icon icon={TokenIcon} />;
 
 export const VISIBLE_ICON = <Icon icon={EyeIcon} />;
@@ -86,6 +95,43 @@ export const CHEVRON_BOTTOM_ICON = <Icon icon={ChevronDownsvgIcon} />;
 export const COPY_ICON = <Icon icon={CopyIcon} />;
 export const CREATE_ICON = <Icon icon={CreateIcon} />;
 export const FETCH_ICON = <Icon icon={FetchIcon} />;
+export const DOWNLOAD_ICON = <Icon icon={DownloadsvgIcon} />;
+
+export function iconForTplType(type: TplType): SvgIcon {
+  switch (type) {
+    case "text":
+      return TextBlockIcon;
+    case "heading":
+      return HeadingIcon;
+    case "image":
+      return ImageBlockIcon;
+    case "link":
+      return LinkIcon;
+    case "input":
+      return TextInputIcon;
+    case "passwordInput":
+      return PassInputIcon;
+    case "button":
+      return ButtonInputIcon;
+    case "textarea":
+      return AreaInputIcon;
+    case "slot":
+      return SlotIcon;
+    case "component":
+      return ComponentIcon;
+    case "freeContainer":
+      return BlockIcon;
+    case "vertStack":
+      return VStackBlockIcon;
+    case "horizStack":
+      return HStackBlockIcon;
+    case "grid":
+      return GridIcon;
+    case "contentLayout":
+      return TableRowsPageSectionIcon;
+  }
+}
+
 export function getVisibilityIcon(visibility: TplVisibility) {
   if (visibility === TplVisibility.DisplayNone) {
     return HIDDEN_ICON;
@@ -97,3 +143,9 @@ export function getVisibilityIcon(visibility: TplVisibility) {
     return VISIBLE_ICON;
   }
 }
+
+export const DataTokenIcon: SvgIcon = BracesIcon;
+export const DataQueryIcon: SvgIcon = DatabaseSvgIcon;
+export const StateIcon: SvgIcon = InputFieldSvgIcon;
+export const PropIcon: SvgIcon = SettingsSlidersSvgIcon;
+export const UrlIcon: SvgIcon = LinkSvgIcon;

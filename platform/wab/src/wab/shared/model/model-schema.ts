@@ -26,6 +26,9 @@ Type
     Choice
       @Const name: 'choice'
       options: [String | Number | Bool] | [Map[String, String | Number | Bool]]
+    MultiChoice
+      @Const name: 'multiChoice'
+      options: [String | Number | Bool] | [Map[String, String | Number | Bool]]
   Img
     @Const name: 'img'
   ComponentInstance
@@ -417,6 +420,7 @@ CodeComponentMeta
   providesData: Bool
   hasRef: Bool
   isRepeatable: Bool
+  subtreePrefetchingConfig: Bool?
   styleSections: Bool?
   helpers: CodeComponentHelper?
   # where Any is PlasmicElement|PlasmicElement[]
@@ -685,7 +689,7 @@ DataSourceTemplate
   value: TemplatedString | String
   bindings: Map[String, TemplatedString | CustomCode | ObjectPath]?
 QueryRef
-  @WeakRef ref: TplNode|ComponentDataQuery
+  @WeakRef ref: TplNode|ComponentDataQuery|ComponentServerQuery
 
 State (concrete)
   @Const @WeakRef param: StateParam

@@ -1,14 +1,12 @@
 import "@/wab/client/components/canvas/slate";
 import { mkBaseVariant } from "@/wab/shared/Variants";
 import { assert } from "@/wab/shared/common";
-import {
-  isTagInline,
-  isTagListContainer,
-} from "@/wab/shared/core/rich-text-util";
+import { nodeMarkerText } from "@/wab/shared/core/rich-text-util";
 import * as Tpls from "@/wab/shared/core/tpls";
 import { TplTagType, mkTplTag } from "@/wab/shared/core/tpls";
 import { normProp, parseCssNumericNew } from "@/wab/shared/css";
 import { EffectiveVariantSetting } from "@/wab/shared/effective-variant-setting";
+import { isTagInline, isTagListContainer } from "@/wab/shared/html";
 import {
   Marker,
   NodeMarker,
@@ -58,14 +56,9 @@ export function isExplicitlySized(effectiveVs: EffectiveVariantSetting) {
   return hasExplicitSize("width") && hasExplicitSize("height");
 }
 
-// nodeMarkerText is the string that replaces NodeMarkers in RawText.text.
-// This value is used, for example, in tpl-tree, i.e. a text like `This is a
-// <a href="...">link</a>` will be seen as `This is a {nodeMarkerText}` there.
-const nodeMarkerText = "[child]";
 export type ResolvedMarkers = {
   text: RawText["text"];
   markers: Marker[];
-  newTpls: boolean;
 };
 export function resolveNodesToMarkers(
   nodes: Descendant[],
@@ -73,7 +66,6 @@ export function resolveNodesToMarkers(
 ): ResolvedMarkers {
   const rawText: string[] = [];
   const markers: Marker[] = [];
-  let newTpls = false;
 
   function addNodeMarkers(node: Descendant) {
     if (Element.isElement(node)) {
@@ -92,7 +84,6 @@ export function resolveNodesToMarkers(
           : {
               type: TplTagType.Text,
             };
-        newTpls = newTpls || !node.uuid;
         const tpl = mkTplTag(node.tag, [], {
           uuid: node.uuid,
           attrs: node.attributes || {},
@@ -117,7 +108,6 @@ export function resolveNodesToMarkers(
               return m.tpl;
             });
           }
-          newTpls = newTpls || child.newTpls;
         }
         markers.push(
           new NodeMarker({
@@ -162,7 +152,7 @@ export function resolveNodesToMarkers(
   if (lineBreaks) {
     rawText.pop();
   }
-  return { text: rawText.join(""), markers, newTpls };
+  return { text: rawText.join(""), markers };
 }
 
 /**

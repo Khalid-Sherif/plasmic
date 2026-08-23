@@ -19,15 +19,14 @@ import {
 } from "@/wab/client/observability/events/insert-item";
 import ComponentIcon from "@/wab/client/plasmic/plasmic_kit/PlasmicIcon__Component";
 import { StudioCtx, useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import { UiActionsOverlay } from "@/wab/client/studio-ctx/ui/studio-ui-actions";
+import { mkModelUiId } from "@/wab/client/studio-ctx/ui/studio-ui-ids";
 import { ViewCtx } from "@/wab/client/studio-ctx/view-ctx";
 import { MainBranchId } from "@/wab/shared/ApiSchema";
 import { isMixedArena } from "@/wab/shared/Arenas";
 import { FRAME_CAP } from "@/wab/shared/Labels";
 import { isBuiltinCodeComponent } from "@/wab/shared/code-components/builtin-code-components";
-import {
-  UnknownComponentError,
-  compareComponentPropsWithMeta,
-} from "@/wab/shared/code-components/code-components";
+import { compareComponentPropsWithMeta } from "@/wab/shared/code-components/code-components";
 import { spawn } from "@/wab/shared/common";
 import {
   CodeComponent,
@@ -48,6 +47,7 @@ import { Component } from "@/wab/shared/model/classes";
 import { mkProjectLocation } from "@/wab/shared/route/app-routes";
 import { Menu, Popover, notification } from "antd";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import * as React from "react";
 
 export const ComponentRow = observer(function ComponentRow(props: {
@@ -108,74 +108,77 @@ export const ComponentRow = observer(function ComponentRow(props: {
   })();
 
   return (
-    <DraggableInsertable
-      sc={studioCtx}
-      onDragEnd={(_spec, result) => {
-        const tplComponent = result?.[1];
-        if (isTplComponent(tplComponent)) {
-          trackInsertItem({
-            from: "components-tab",
-            dragged: true,
-            ...getEventDataForTplComponent(tplComponent),
-          });
-        }
-      }}
-      spec={{
-        key: component.uuid,
-        label: getComponentDisplayName(component),
-        factory: (vc: ViewCtx) => {
-          return vc.variantTplMgr().mkTplComponentWithDefaults(component);
-        },
-        icon: (
-          <Icon
-            icon={ComponentIcon}
-            className={!isCodeComp ? "component-fg" : undefined}
-          />
-        ),
-        type: AddItemType.tpl,
-      }}
-    >
-      <RowItem
-        style={{
-          height: 32,
-          paddingLeft: calcIndent * 16 + 6,
-          paddingRight: 6,
+    <>
+      <DraggableInsertable
+        sc={studioCtx}
+        onDragEnd={(_spec, result) => {
+          const tplComponent = result?.[1];
+          if (isTplComponent(tplComponent)) {
+            trackInsertItem({
+              from: "components-tab",
+              dragged: true,
+              ...getEventDataForTplComponent(tplComponent),
+            });
+          }
         }}
-        icon={icon}
-        menu={overlay}
-        menuSize={"small"}
-        onClick={
-          isPlainComponent
-            ? () => {
-                spawn(
-                  studioCtx.change(({ success }) => {
-                    studioCtx.switchToComponentArena(component);
-                    return success();
-                  })
-                );
-              }
-            : undefined
-        }
-        data-test-id={`listitem-component-${component.name}`}
+        spec={{
+          key: component.uuid,
+          label: getComponentDisplayName(component),
+          factory: (vc: ViewCtx) => {
+            return vc.variantTplMgr().mkTplComponentWithDefaults(component);
+          },
+          icon: (
+            <Icon
+              icon={ComponentIcon}
+              className={!isCodeComp ? "component-fg" : undefined}
+            />
+          ),
+          type: AddItemType.tpl,
+        }}
       >
-        {defaultComponentKind ? (
-          <Popover
-            content={
-              <p>
-                <strong>Default component:</strong>{" "}
-                {getDefaultComponentLabel(defaultComponentKind)}
-              </p>
-            }
-          >
-            <strong>
-              {matcher.boldSnippets(getFolderComponentDisplayName(component))}
-            </strong>
-          </Popover>
-        ) : (
-          matcher.boldSnippets(getFolderComponentDisplayName(component))
-        )}
-      </RowItem>
-    </DraggableInsertable>
+        <RowItem
+          style={{
+            height: 32,
+            paddingLeft: calcIndent * 16 + 6,
+            paddingRight: 6,
+          }}
+          icon={icon}
+          menu={overlay}
+          menuSize={"small"}
+          onClick={
+            isPlainComponent
+              ? () => {
+                  spawn(
+                    studioCtx.change(() => {
+                      studioCtx.switchToComponentArena(component);
+                      return ok();
+                    })
+                  );
+                }
+              : undefined
+          }
+          data-test-id={`listitem-component-${component.name}`}
+        >
+          {defaultComponentKind ? (
+            <Popover
+              content={
+                <p>
+                  <strong>Default component:</strong>{" "}
+                  {getDefaultComponentLabel(defaultComponentKind)}
+                </p>
+              }
+            >
+              <strong>
+                {matcher.boldSnippets(getFolderComponentDisplayName(component))}
+              </strong>
+            </Popover>
+          ) : (
+            matcher.boldSnippets(getFolderComponentDisplayName(component))
+          )}
+        </RowItem>
+      </DraggableInsertable>
+      <UiActionsOverlay uiId={mkModelUiId(component)} />
+    </>
   );
 });
 
@@ -284,9 +287,9 @@ function buildPlasmicComponentMenuItems(
           onClick={() =>
             studioCtx.changeObserved(
               () => [component],
-              ({ success }) => {
+              () => {
                 studioCtx.siteOps().convertComponentToPage(component);
-                return success();
+                return ok();
               }
             )
           }
@@ -353,8 +356,8 @@ function buildCodeComponentMenuItems(
             component,
             meta
           );
-          diffsOrError.match({
-            success: (diffs) => {
+          diffsOrError.match(
+            (diffs) => {
               if (
                 [diffs.addedProps, diffs.removedProps, diffs.updatedProps].some(
                   (i) => i.length > 0
@@ -373,13 +376,13 @@ function buildCodeComponentMenuItems(
                 });
               }
             },
-            failure: (err: UnknownComponentError) => {
+            (err) => {
               notification.error({
                 message: err.message,
               });
               reportError(err);
-            },
-          });
+            }
+          );
         }}
       >
         <strong>Refresh</strong> registered props
@@ -448,11 +451,11 @@ function buildCommonComponentMenuItems(
           ));
           if (kind) {
             spawn(
-              studioCtx.change(({ success }) => {
+              studioCtx.change(() => {
                 studioCtx
                   .siteOps()
                   .promoteComponentToDefaultKind(studioCtx, component, kind);
-                return success();
+                return ok();
               })
             );
           }
@@ -470,9 +473,9 @@ function buildCommonComponentMenuItems(
         <Menu.Item
           key="demote-default-kind"
           onClick={async () => {
-            await studioCtx.change(({ success }) => {
+            await studioCtx.change(() => {
               delete studioCtx.site.defaultComponents[kind];
-              return success();
+              return ok();
             });
           }}
         >
@@ -487,10 +490,10 @@ function buildCommonComponentMenuItems(
       <Menu.Item
         key="set-page-wrapper"
         onClick={async () => {
-          await studioCtx.change(({ success }) => {
+          await studioCtx.change(() => {
             studioCtx.site.pageWrapper =
               studioCtx.site.pageWrapper === component ? undefined : component;
-            return success();
+            return ok();
           });
         }}
       >

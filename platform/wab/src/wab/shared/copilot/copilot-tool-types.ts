@@ -1,0 +1,104 @@
+import type { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import { jsonToXml } from "@/wab/shared/web-exporter/json-to-xml";
+import { zodSchema, type JSONSchema7 } from "ai";
+import { z } from "zod";
+
+/** Serialization format an AI agent prefers for copilot tool output. */
+export type AiOutputFormat = "json" | "xml";
+
+export type CopilotToolMeta<
+  TInput extends
+    | JSONSchema7
+    | z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>,
+  TOutput extends JSONSchema7 | z.ZodTypeAny = z.ZodTypeAny
+> = {
+  /** Unique name, used as both tool ID and AI tool name */
+  toolName: string;
+  /** Human-readable title for the tool */
+  title: string;
+  /** Used in the AI tool schema */
+  description: string;
+  /** Schema for input, defines AI tool params */
+  inputSchema: TInput;
+  /** Schema the tool's output is validated against and serialized from */
+  outputSchema: TOutput;
+};
+
+export type CopilotTool<
+  TInput extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>,
+  TOutput extends z.ZodTypeAny = z.ZodTypeAny
+> = CopilotToolMeta<TInput, TOutput> & {
+  /**
+   * Execute the tool, returning the serialized output in the agent's preferred format.
+   * The wrapper validates raw input against `inputSchema`, running any transforms.
+   * Throws on error. `opts.prettify` indents the output for testing (default false).
+   */
+  execute: (
+    studioCtx: StudioCtx,
+    input: z.input<TInput>,
+    opts?: { prettify?: boolean }
+  ) => Promise<string>;
+};
+
+/**
+ * Helper to define a CopilotTool so the execute function's input and output are fully
+ * typed. The wrapper parses the wire input against `inputSchema` (schema transforms
+ * run in the host frame, since Expr outputs can't cross the frame boundary). The authored
+ * execute receives the parsed input and returns the typed output model, which the wrapper
+ * validates against `outputSchema` and serializes to the agent's preferred format.
+ */
+export function defineCopilotTool<
+  TInput extends z.ZodObject<z.ZodRawShape>,
+  TOutput extends z.ZodTypeAny
+>(
+  meta: CopilotToolMeta<TInput, TOutput>,
+  execute: (
+    studioCtx: StudioCtx,
+    input: z.infer<TInput>
+  ) => Promise<z.infer<TOutput>>
+): CopilotTool<TInput, TOutput> {
+  return {
+    ...meta,
+    execute: async (studioCtx, input, opts) => {
+      const prettify = opts?.prettify ?? false;
+      const parsedInput = meta.inputSchema.parse(input);
+      const output = meta.outputSchema.parse(
+        await execute(studioCtx, parsedInput)
+      );
+      return studioCtx.preferredAiOutputFormat() === "xml"
+        ? jsonToXml(output, prettify)
+        : JSON.stringify(output, null, prettify ? 2 : undefined);
+    },
+  };
+}
+
+/**
+ * Convert Copilot tool definitions from Zod schemas to JSON Schema, for both
+ * input (AI tool params) and output (introspectable result shape).
+ */
+export function mapCopilotToolsToJsonSchema(
+  tools: Record<string, CopilotToolMeta>
+): Record<string, CopilotToolMeta<JSONSchema7, JSONSchema7>> {
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, tool]) => [
+      name,
+      {
+        // Key off the tools key, which is the name tools are invoked by, so
+        // it is aligned with the callable tools even if a def's `toolName`
+        // field ever diverges from its key.
+        toolName: name,
+        title: tool.title,
+        description: tool.description,
+        // Schema.jsonSchema is JSONSchema7 | PromiseLike<JSONSchema7> to cover
+        // async/raw JSON-schema sources, but zodSchema() always builds it
+        // synchronously, so it is a JSONSchema7 here.
+        inputSchema: zodSchema(tool.inputSchema).jsonSchema as JSONSchema7,
+        // useReferences lets recursive schemas such as Expr.fallback come out
+        // as `$ref` instead of degrading to `any` with a console warning.
+        // Output schemas never reach the model provider, so `$ref` is not a concern here.
+        outputSchema: zodSchema(tool.outputSchema, { useReferences: true })
+          .jsonSchema as JSONSchema7,
+      },
+    ])
+  );
+}

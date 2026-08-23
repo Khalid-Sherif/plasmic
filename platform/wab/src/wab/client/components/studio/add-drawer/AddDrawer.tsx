@@ -14,16 +14,17 @@ import {
   checkAndNotifyUnsupportedHostVersion,
   checkAndNotifyUnsupportedReactVersion,
   notifyCodeLibraryInstalled,
-  notifyInstallableSuccess,
 } from "@/wab/client/components/modals/codeComponentModals";
 import {
   getPlumeComponentTemplates,
   getPlumeImage,
 } from "@/wab/client/components/plume/plume-display-utils";
 import { PlumyIcon } from "@/wab/client/components/plume/plume-markers";
+import { mkCustomFunctionArgs } from "@/wab/client/components/sidebar-tabs/ServerQuery/ServerQueryOpPicker";
 import { ImagePreview } from "@/wab/client/components/style-controls/ImageSelector";
 import { Icon } from "@/wab/client/components/widgets/Icon";
 import {
+  AddCustomFunctionItem,
   AddFakeItem,
   AddInstallableItem,
   AddItem,
@@ -35,6 +36,7 @@ import {
 import {
   COMBINATION_ICON,
   COMPONENT_ICON,
+  FUNCTION_ICON,
   GROUP_ICON,
 } from "@/wab/client/icons";
 import {
@@ -48,7 +50,6 @@ import PlumeMarkIcon from "@/wab/client/plasmic/plasmic_kit_design_system/icons/
 import { promptChooseInstallableDependencies } from "@/wab/client/prompts";
 import { StudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
 import { ViewCtx } from "@/wab/client/studio-ctx/view-ctx";
-import { SERVER_QUERY_PLURAL_LOWER } from "@/wab/shared/Labels";
 import { getParentOrSlotSelection } from "@/wab/shared/SlotUtils";
 import { getBaseVariant } from "@/wab/shared/Variants";
 import { usedHostLessPkgs } from "@/wab/shared/cached-selectors";
@@ -62,6 +63,7 @@ import {
   ensure,
   ensureArray,
   hackyCast,
+  mkShortId,
   replaceAll,
   spawn,
   withoutNils,
@@ -78,7 +80,7 @@ import {
 import { codeLit } from "@/wab/shared/core/exprs";
 import { ImageAssetType } from "@/wab/shared/core/image-asset-type";
 import { syncGlobalContexts } from "@/wab/shared/core/project-deps";
-import { isTagListContainer } from "@/wab/shared/core/rich-text-util";
+import { customFunctionId } from "@/wab/shared/core/query-ids";
 import { SlotSelection } from "@/wab/shared/core/slots";
 import { unbundleProjectDependency } from "@/wab/shared/core/tagged-unbundle";
 import * as Tpls from "@/wab/shared/core/tpls";
@@ -88,8 +90,11 @@ import {
   InsertableTemplatesComponent,
   InsertableTemplatesItem,
   Installable,
+  PreInstallComponentInfo,
+  PreInstallFunctionInfo,
 } from "@/wab/shared/devflags";
 import { Rect } from "@/wab/shared/geom";
+import { isTagListContainer } from "@/wab/shared/html";
 import {
   cloneInsertableTemplate,
   cloneInsertableTemplateArena,
@@ -104,6 +109,9 @@ import {
 import {
   Arena,
   Component,
+  ComponentServerQuery,
+  CustomFunction,
+  CustomFunctionExpr,
   Expr,
   ImageAsset,
   ProjectDependency,
@@ -119,7 +127,39 @@ import {
 import { getPlumeEditorPlugin } from "@/wab/shared/plume/plume-registry";
 import { notification } from "antd";
 import { mapValues, uniqBy } from "lodash";
+import { ok } from "neverthrow";
 import * as React from "react";
+
+/**
+ * Whether a hostless package should be listed in insert UIs (insert panel,
+ * component store, server query picker).
+ *
+ * Packages are shown by default. A package marked `hidden` is only shown to
+ * users whose email domain is in `whitelistDomains` or whose team is in
+ * `whitelistTeams`.
+ */
+export function shouldShowHostLessPackage(
+  studioCtx: StudioCtx,
+  meta: HostLessPackageInfo
+) {
+  if (meta.hidden) {
+    if (meta.whitelistDomains) {
+      const domain = studioCtx.appCtx.selfInfo?.email.split("@")[1];
+      if (domain && meta.whitelistDomains.includes(domain)) {
+        return true;
+      }
+    }
+    if (
+      meta.whitelistTeams &&
+      studioCtx.siteInfo.teamId &&
+      meta.whitelistTeams.includes(studioCtx.siteInfo.teamId)
+    ) {
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
 
 export function createAddTplImage(asset: ImageAsset): AddTplItem {
   return {
@@ -649,6 +689,63 @@ export function createInstallOnlyPackage(
   };
 }
 
+/**
+ * Tile for a component from a package that hasn't been installed yet.
+ * Clicking it installs the package and inserts that specific component.
+ */
+export function createAddPackageComponent(
+  meta: PreInstallComponentInfo,
+  projectIds: string[]
+): AddTplItem<HostLessComponentExtraInfo | false> {
+  return {
+    type: AddItemType.tpl as const,
+    key: `package-component-${meta.componentName}`,
+    systemName: meta.componentName,
+    label: meta.displayName,
+    canWrap: false,
+    icon: COMBINATION_ICON,
+    isDisabled: !meta.isRoot,
+    description: meta.isRoot
+      ? meta.description
+      : meta.description ?? "Add the root component first to use this.",
+    factory: (vc, ctx) => {
+      if (!ctx) {
+        return undefined;
+      }
+      const { component, args } = ctx;
+      if (!component) {
+        return undefined;
+      }
+      return vc.variantTplMgr().mkTplComponentX({
+        component,
+        args,
+      });
+    },
+    asyncExtraInfo: async (sc, opts) => {
+      return await sc.app.withSpinner(
+        (async () => {
+          const { deps } = await installHostlessPkgs(sc, projectIds);
+          if (!deps) {
+            return false;
+          }
+          const component = ensure(
+            deps
+              .flatMap((dep2) => dep2.site.components)
+              .find((c) => c.name === meta.componentName.split("/")[0]),
+            "comp should exist"
+          );
+          const ccMeta = component && sc.getCodeComponentMeta(component);
+          if (opts?.isDragging || !ccMeta || !hackyCast(ccMeta).preInsertion) {
+            return { dep: deps, component, args: undefined };
+          }
+          const argsPre = await getPreInsertionProps(sc, component);
+          return { dep: deps, component, args: argsPre };
+        })()
+      );
+    },
+  };
+}
+
 export function createFakeHostLessComponent(
   meta: HostLessComponentInfo,
   projectIds: string[]
@@ -689,12 +786,6 @@ export function createFakeHostLessComponent(
         });
       });
       console.log("createFakeHostlessComponent", ctx);
-      if (meta.isCustomFunction) {
-        notifyInstallableSuccess(
-          meta.displayName,
-          `New ${SERVER_QUERY_PLURAL_LOWER} can now be used.`
-        );
-      }
       return true;
     },
     asyncExtraInfo: async (sc) => {
@@ -711,12 +802,142 @@ export function createFakeHostLessComponent(
   };
 }
 
+async function createDraftQueryForFunction(
+  studioCtx: StudioCtx,
+  fn: CustomFunction
+): Promise<ComponentServerQuery | undefined> {
+  const component = studioCtx.focusedOrFirstViewCtx()?.component;
+  if (!component) {
+    notification.warn({
+      message: "Can't add data query",
+      description: "Select an artboard first, then try again.",
+    });
+    return undefined;
+  }
+  const op = new CustomFunctionExpr({
+    func: fn,
+    args: mkCustomFunctionArgs(studioCtx, fn, "query"),
+  });
+  const result = await studioCtx.change<never, ComponentServerQuery>(() => {
+    const newQuery = new ComponentServerQuery({
+      uuid: mkShortId(),
+      name: studioCtx.tplMgr().getUniqueServerQueryName(component, "Query"),
+      op,
+    });
+    component.serverQueries.push(newQuery);
+    return ok(newQuery);
+  });
+  return result.isErr() ? undefined : result.value;
+}
+
+/**
+ * Tile for an installed custom function
+ */
+export function createAddCustomFunction(
+  fn: CustomFunction,
+  dep: ProjectDependency
+): AddCustomFunctionItem {
+  return {
+    type: AddItemType.customFunction as const,
+    key: `custom-function-${customFunctionId(fn)}`,
+    label: fn.displayName ?? fn.importName,
+    icon: FUNCTION_ICON,
+    projectIds: [dep.projectId],
+    createDraftQuery: (sc) => createDraftQueryForFunction(sc, fn),
+  };
+}
+
+async function installAndCreateDraftQuery(
+  sc: StudioCtx,
+  packageMeta: HostLessPackageInfo,
+  resolveFn: (deps: ProjectDependency[]) => CustomFunction | undefined,
+  displayName: string
+): Promise<ComponentServerQuery | undefined> {
+  const projectIds = ensureArray(packageMeta.projectId);
+  const { deps, installed } = await installHostlessPkgs(sc, projectIds);
+  if (!deps) {
+    notification.error({ message: `Couldn't install ${packageMeta.name}` });
+    return undefined;
+  }
+  const fn = resolveFn(deps);
+  if (!fn) {
+    notification.error({
+      message: `${packageMeta.name} has no custom functions`,
+    });
+    return undefined;
+  }
+  if (installed) {
+    notification.success({
+      message: `${displayName} has successfully been installed!`,
+    });
+  }
+  if (!fn.isQuery) {
+    return undefined;
+  }
+  return createDraftQueryForFunction(sc, fn);
+}
+
+export function createAddCustomFunctionFromMeta(
+  meta: HostLessComponentInfo,
+  packageMeta: HostLessPackageInfo
+): AddCustomFunctionItem {
+  const projectIds = ensureArray(packageMeta.projectId);
+  return {
+    type: AddItemType.customFunction as const,
+    key: `custom-function-${meta.componentName}`,
+    label: meta.displayName,
+    icon: FUNCTION_ICON,
+    monospaced: meta.monospaced,
+    description: meta.description,
+    previewImageUrl: meta.imageUrl,
+    previewVideoUrl: meta.videoUrl,
+    projectIds,
+    createDraftQuery: (sc) =>
+      sc.app.withSpinner(
+        installAndCreateDraftQuery(
+          sc,
+          packageMeta,
+          (deps) => {
+            const fns = deps.flatMap((d) => d.site.customFunctions);
+            return fns.find((f) => f.isQuery) ?? fns[0];
+          },
+          meta.displayName
+        )
+      ),
+  };
+}
+
+export function createAddPackageFunction(
+  fnInfo: PreInstallFunctionInfo,
+  packageMeta: HostLessPackageInfo
+): AddCustomFunctionItem {
+  const projectIds = ensureArray(packageMeta.projectId);
+  return {
+    type: AddItemType.customFunction as const,
+    key: `package-function-${fnInfo.functionId}`,
+    label: fnInfo.displayName,
+    icon: FUNCTION_ICON,
+    description: fnInfo.description,
+    projectIds,
+    createDraftQuery: (sc) =>
+      installAndCreateDraftQuery(
+        sc,
+        packageMeta,
+        (deps) =>
+          deps
+            .flatMap((d) => d.site.customFunctions)
+            .find((f) => customFunctionId(f) === fnInfo.functionId),
+        fnInfo.displayName
+      ),
+  };
+}
+
 async function installHostlessPkgs(sc: StudioCtx, projectIds: string[]) {
   const existingDep = sc.site.projectDependencies.filter((dep) =>
     projectIds.includes(dep.projectId)
   );
   if (existingDep && existingDep.length === projectIds.length) {
-    return { deps: existingDep };
+    return { deps: existingDep, installed: false };
   }
   const projectDependencies = existingDep;
   const remainingProjectIds = projectIds.filter(
@@ -735,14 +956,14 @@ async function installHostlessPkgs(sc: StudioCtx, projectIds: string[]) {
   }
 
   if (checkAndNotifyUnsupportedReactVersion(projectDependencies)) {
-    return { deps: undefined };
+    return { deps: undefined, installed: false };
   }
   await sc.updateCcRegistry([
     ...usedHostLessPkgs(sc.site),
     ...projectDependencies.flatMap((dep) => usedHostLessPkgs(dep.site)),
   ]);
 
-  await sc.change(({ success }) => {
+  await sc.change(() => {
     for (const projectDependency of projectDependencies) {
       if (
         !sc.site.projectDependencies.some(
@@ -759,9 +980,9 @@ async function installHostlessPkgs(sc: StudioCtx, projectIds: string[]) {
       sc.site,
       sc.getCodeComponentsAndContextsRegistration()
     );
-    return success();
+    return ok();
   });
-  return { deps: projectDependencies };
+  return { deps: projectDependencies, installed: true };
 }
 
 export function createAddInsertableIcon(icon: ImageAsset): AddTplItem {
@@ -922,12 +1143,12 @@ export function makePlumeInsertables(
               component.name,
               isComponentInserted
             );
-          syncPlumeComponent(studioCtx, newComponent).match({
-            success: (x) => x,
-            failure: (err) => {
+          syncPlumeComponent(studioCtx, newComponent).match(
+            (x) => x,
+            (err) => {
               throw err;
-            },
-          });
+            }
+          );
           const tpl = vc
             .variantTplMgr()
             .mkTplComponentWithDefaults(newComponent);
@@ -953,11 +1174,11 @@ export function maybeShowGlobalContextNotification(
 ) {
   const key = "global-context-notification";
   const goToSettings = async () => {
-    await studioCtx.change(({ success }) => {
-      studioCtx.hideOmnibar();
+    await studioCtx.change(() => {
+      studioCtx.hidePresetsModal();
       studioCtx.switchLeftTab("settings", { highlight: true });
       notification.close(key);
-      return success();
+      return ok();
     });
   };
   const tryExtractDataSourceProp = (c: Component) => {

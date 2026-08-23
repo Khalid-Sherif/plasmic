@@ -1,6 +1,6 @@
-// @ts-nocheck
 /* eslint-disable */
 /* tslint:disable */
+// @ts-nocheck
 /* prettier-ignore-start */
 
 /** @jsxRuntime classic */
@@ -14,19 +14,17 @@
 import * as React from "react";
 
 import {
-  Flex as Flex__,
-  SingleBooleanChoiceArg,
-  SingleChoiceArg,
-  Stack as Stack__,
-  StrictProps,
   classNames,
   createPlasmicElementProxy,
   deriveRenderOpts,
+  Flex as Flex__,
   generateStateOnChangeProp,
   generateStateValueProp,
   hasVariant,
   renderPlasmicSlot,
-  useCurrentUser,
+  SingleBooleanChoiceArg,
+  SingleChoiceArg,
+  StrictProps,
   useDollarState,
 } from "@plasmicapp/react-web";
 import { useDataEnv } from "@plasmicapp/react-web/lib/host";
@@ -38,26 +36,24 @@ import CollapsableSection from "../../components/widgets/CollapsableSection"; //
 import Select from "../../components/widgets/Select"; // plasmic-import: j_4IQyOWK2b/component
 import Switch from "../../components/widgets/Switch"; // plasmic-import: b35JDgXpbiF/component
 import Textbox from "../../components/widgets/Textbox"; // plasmic-import: pA22NEzDCsn_/component
+import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-import: frhoorZk3bxNXU73uUyvHm/styleTokensProvider
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import plasmic_plasmic_kit_color_tokens_css from "../plasmic_kit_q_4_color_tokens/plasmic_plasmic_kit_q_4_color_tokens.module.css"; // plasmic-import: 95xp9cYcv7HrNWpFWWhbcv/projectcss
-import plasmic_plasmic_kit_new_design_system_former_style_controls_css from "../plasmic_kit_style_controls/plasmic_plasmic_kit_styles_pane.module.css"; // plasmic-import: gYEVvAzCcLMHDVPvuYxkFh/projectcss
-import plasmic_plasmic_kit_design_system_deprecated_css from "../PP__plasmickit_design_system.module.css"; // plasmic-import: tXkSR39sgCDWSitZxC5xFV/projectcss
-import projectcss from "./plasmic_plasmic_kit_state_management.module.css"; // plasmic-import: frhoorZk3bxNXU73uUyvHm/projectcss
+import "./plasmic_plasmic_kit_state_management.css"; // plasmic-import: frhoorZk3bxNXU73uUyvHm/projectcss
 import sty from "./PlasmicParamSection.module.css"; // plasmic-import: RzN6mQN5_D/css
 
 import PlusIcon from "../plasmic_kit/PlasmicIcon__Plus"; // plasmic-import: -k064DlQ8k8-L/icon
-import ArrowRightsvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__ArrowRightSvg"; // plasmic-import: 9Jv8jb253/icon
-import ChevronDownsvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__ChevronDownSvg"; // plasmic-import: xZrB9_0ir/icon
-import ClosesvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__CloseSvg"; // plasmic-import: DhvEHyCHT/icon
-import PlussvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__PlusSvg"; // plasmic-import: sQKgd2GNr/icon
-import SearchsvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__SearchSvg"; // plasmic-import: R5DLz11OA/icon
+import ArrowRightSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__ArrowRightSvg"; // plasmic-import: 9Jv8jb253/icon
+import ChevronDownSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__ChevronDownSvg"; // plasmic-import: xZrB9_0ir/icon
+import CloseSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__CloseSvg"; // plasmic-import: DhvEHyCHT/icon
+import PlusSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__PlusSvg"; // plasmic-import: sQKgd2GNr/icon
+import SearchSvgIcon from "../plasmic_kit_icons/icons/PlasmicIcon__SearchSvg"; // plasmic-import: R5DLz11OA/icon
 
 createPlasmicElementProxy;
 
 export type PlasmicParamSection__VariantMembers = {
-  specialParamType: "eventHandler" | "localizable";
+  specialParamType: "eventHandler" | "localizable" | "choice";
   isInvalid: "isInvalid";
   hidePropType: "hidePropType";
   hideDefaultValue: "hideDefaultValue";
@@ -66,7 +62,7 @@ export type PlasmicParamSection__VariantMembers = {
   fixedParamType: "fixedParamType";
 };
 export type PlasmicParamSection__VariantsArgs = {
-  specialParamType?: SingleChoiceArg<"eventHandler" | "localizable">;
+  specialParamType?: SingleChoiceArg<"eventHandler" | "localizable" | "choice">;
   isInvalid?: SingleBooleanChoiceArg<"isInvalid">;
   hidePropType?: SingleBooleanChoiceArg<"hidePropType">;
   hideDefaultValue?: SingleBooleanChoiceArg<"hideDefaultValue">;
@@ -87,14 +83,16 @@ export const PlasmicParamSection__VariantProps = new Array<VariantPropType>(
 
 export type PlasmicParamSection__ArgsType = {
   componentName?: string;
-  defaultArgs?: React.ReactNode;
+  choiceSettings?: React.ReactNode;
   plusIcon?: React.ReactNode;
+  defaultArgs?: React.ReactNode;
 };
 type ArgPropType = keyof PlasmicParamSection__ArgsType;
 export const PlasmicParamSection__ArgProps = new Array<ArgPropType>(
   "componentName",
-  "defaultArgs",
-  "plusIcon"
+  "choiceSettings",
+  "plusIcon",
+  "defaultArgs"
 );
 
 export type PlasmicParamSection__OverridesType = {
@@ -114,9 +112,10 @@ export type PlasmicParamSection__OverridesType = {
 
 export interface DefaultParamSectionProps {
   componentName?: string;
-  defaultArgs?: React.ReactNode;
+  choiceSettings?: React.ReactNode;
   plusIcon?: React.ReactNode;
-  specialParamType?: SingleChoiceArg<"eventHandler" | "localizable">;
+  defaultArgs?: React.ReactNode;
+  specialParamType?: SingleChoiceArg<"eventHandler" | "localizable" | "choice">;
   isInvalid?: SingleBooleanChoiceArg<"isInvalid">;
   hidePropType?: SingleBooleanChoiceArg<"hidePropType">;
   hideDefaultValue?: SingleBooleanChoiceArg<"hideDefaultValue">;
@@ -142,7 +141,9 @@ function PlasmicParamSection__RenderFunc(props: {
         {
           componentName: "ComponentName",
         },
-        props.args
+        Object.fromEntries(
+          Object.entries(props.args).filter(([_, v]) => v !== undefined)
+        )
       ),
     [props.args]
   );
@@ -156,15 +157,13 @@ function PlasmicParamSection__RenderFunc(props: {
   const refsRef = React.useRef({});
   const $refs = refsRef.current;
 
-  const currentUser = useCurrentUser?.() || {};
-
   const stateSpecs: Parameters<typeof useDollarState>[0] = React.useMemo(
     () => [
       {
         path: "specialParamType",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.specialParamType,
       },
       {
@@ -176,80 +175,81 @@ function PlasmicParamSection__RenderFunc(props: {
         path: "isInvalid",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.isInvalid,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) => $props.isInvalid,
       },
       {
         path: "hidePropType",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.hidePropType,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
+          $props.hidePropType,
       },
       {
         path: "hideDefaultValue",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.hideDefaultValue,
       },
       {
         path: "paramType.value",
         type: "private",
         variableType: "text",
-        initFunc: ({ $props, $state, $queries, $ctx }) => undefined,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) => undefined,
       },
       {
         path: "showAdvancedSection",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) =>
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
           $props.showAdvancedSection,
       },
       {
         path: "hideEventArgs",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.hideEventArgs,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
+          $props.hideEventArgs,
       },
       {
         path: "fixedParamType",
         type: "private",
         variableType: "variant",
-        initFunc: ({ $props, $state, $queries, $ctx }) => $props.fixedParamType,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) =>
+          $props.fixedParamType,
       },
       {
         path: "localizableSwitch.isChecked",
         type: "private",
         variableType: "boolean",
-        initFunc: ({ $props, $state, $queries, $ctx }) => undefined,
+        initFunc: ({ $props, $state, $queries, $q, $ctx }) => undefined,
       },
     ],
-
     [$props, $ctx, $refs]
   );
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
     $queries: {},
+    $q: {},
     $refs,
   });
 
+  const styleTokensClassNames = _useStyleTokens();
+
   return (
-    <Stack__
-      as={"div"}
+    <div
       data-plasmic-name={"root"}
       data-plasmic-override={overrides.root}
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
-      hasGap={true}
       className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
-        projectcss.plasmic_tokens,
-        plasmic_plasmic_kit_design_system_deprecated_css.plasmic_tokens,
-        plasmic_plasmic_kit_color_tokens_css.plasmic_tokens,
-        plasmic_plasmic_kit_new_design_system_former_style_controls_css.plasmic_tokens,
+        "all",
+        "root_reset_frhoorZk3bxNXU73uUyvHm",
+        "plasmic_default_styles",
+        "plasmic_mixins",
+        styleTokensClassNames,
         sty.root,
         {
           [sty.roothideEventArgs]: hasVariant(
@@ -285,11 +285,7 @@ function PlasmicParamSection__RenderFunc(props: {
           <div
             data-plasmic-name={"name"}
             data-plasmic-override={overrides.name}
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.name
-            )}
+            className={classNames("all", "__wab_text", sty.name)}
           >
             {"Name"}
           </div>
@@ -307,15 +303,15 @@ function PlasmicParamSection__RenderFunc(props: {
               ),
             })}
             prefixIcon={
-              <SearchsvgIcon
-                className={classNames(projectcss.all, sty.svg__sGplF)}
+              <SearchSvgIcon
+                className={classNames("all", sty.svg__sGplF)}
                 role={"img"}
               />
             }
             styleType={["bordered"]}
             suffixIcon={
-              <ClosesvgIcon
-                className={classNames(projectcss.all, sty.svg__oc6C2)}
+              <CloseSvgIcon
+                className={classNames("all", sty.svg__oc6C2)}
                 role={"img"}
               />
             }
@@ -358,15 +354,25 @@ function PlasmicParamSection__RenderFunc(props: {
                 ),
               })}
               icon={
-                <PlussvgIcon
-                  className={classNames(projectcss.all, sty.svg__glNxP)}
+                <PlusSvgIcon
+                  className={classNames("all", sty.svg__glNxP)}
                   role={"img"}
                 />
               }
-              onChange={(...eventArgs) => {
-                generateStateOnChangeProp($state, ["paramType", "value"])(
-                  eventArgs[0]
-                );
+              onChange={async (...eventArgs: any) => {
+                ((...eventArgs) => {
+                  generateStateOnChangeProp($state, ["paramType", "value"])(
+                    eventArgs[0]
+                  );
+                }).apply(null, eventArgs);
+
+                if (
+                  eventArgs.length > 1 &&
+                  eventArgs[1] &&
+                  eventArgs[1]._plasmic_state_init_
+                ) {
+                  return;
+                }
               }}
               type={"bordered"}
               value={generateStateValueProp($state, ["paramType", "value"])}
@@ -389,15 +395,15 @@ function PlasmicParamSection__RenderFunc(props: {
                 })}
                 disabled={true}
                 prefixIcon={
-                  <SearchsvgIcon
-                    className={classNames(projectcss.all, sty.svg__bV23)}
+                  <SearchSvgIcon
+                    className={classNames("all", sty.svg__bV23)}
                     role={"img"}
                   />
                 }
                 styleType={["bordered"]}
                 suffixIcon={
-                  <ClosesvgIcon
-                    className={classNames(projectcss.all, sty.svg__cLA)}
+                  <CloseSvgIcon
+                    className={classNames("all", sty.svg__cLA)}
                     role={"img"}
                   />
                 }
@@ -407,10 +413,33 @@ function PlasmicParamSection__RenderFunc(props: {
         }
       />
 
-      <Stack__
-        as={"div"}
-        hasGap={true}
-        className={classNames(projectcss.all, sty.freeBox__dmbqJ, {
+      {(hasVariant($state, "specialParamType", "choice") ? true : false) ? (
+        <div
+          className={classNames("all", sty.freeBox__lq6Dj, {
+            [sty.freeBoxspecialParamType_choice__lq6DJqvgXu]: hasVariant(
+              $state,
+              "specialParamType",
+              "choice"
+            ),
+            [sty.freeBoxspecialParamType_localizable__lq6DJlJaHq]: hasVariant(
+              $state,
+              "specialParamType",
+              "localizable"
+            ),
+          })}
+        >
+          {renderPlasmicSlot({
+            defaultContents: (
+              <div className={classNames("all", "__wab_text", sty.text__fuiYb)}>
+                {"Choice settings go here..."}
+              </div>
+            ),
+            value: args.choiceSettings,
+          })}
+        </div>
+      ) : null}
+      <div
+        className={classNames("all", sty.freeBox__dmbqJ, {
           [sty.freeBoxspecialParamType_eventHandler__dmbqJmsWcM]: hasVariant(
             $state,
             "specialParamType",
@@ -422,7 +451,7 @@ function PlasmicParamSection__RenderFunc(props: {
         })}
       >
         <div
-          className={classNames(projectcss.all, sty.freeBox__ar9B2, {
+          className={classNames("all", sty.freeBox__ar9B2, {
             [sty.freeBoxspecialParamType_eventHandler__ar9B2MsWcM]: hasVariant(
               $state,
               "specialParamType",
@@ -431,28 +460,23 @@ function PlasmicParamSection__RenderFunc(props: {
           })}
         >
           <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__fc5B,
-              {
-                [sty.textspecialParamType_eventHandler__fc5BMsWcM]: hasVariant(
-                  $state,
-                  "specialParamType",
-                  "eventHandler"
-                ),
-                [sty.textspecialParamType_eventHandler_hideEventArgs__fc5BMsWcMSA5H]:
-                  hasVariant($state, "hideEventArgs", "hideEventArgs") &&
-                  hasVariant($state, "specialParamType", "eventHandler"),
-              }
-            )}
+            className={classNames("all", "__wab_text", sty.text__fc5B, {
+              [sty.textspecialParamType_eventHandler__fc5BMsWcM]: hasVariant(
+                $state,
+                "specialParamType",
+                "eventHandler"
+              ),
+              [sty.textspecialParamType_eventHandler_hideEventArgs__fc5BMsWcMSA5H]:
+                hasVariant($state, "hideEventArgs", "hideEventArgs") &&
+                hasVariant($state, "specialParamType", "eventHandler"),
+            })}
           >
             {"Event handler arguments"}
           </div>
           {renderPlasmicSlot({
             defaultContents: (
               <PlusIcon
-                className={classNames(projectcss.all, sty.svg__di6Bz)}
+                className={classNames("all", sty.svg__di6Bz)}
                 role={"img"}
               />
             ),
@@ -460,15 +484,9 @@ function PlasmicParamSection__RenderFunc(props: {
             value: args.plusIcon,
           })}
         </div>
-        <Stack__
-          as={"div"}
-          hasGap={true}
-          className={classNames(projectcss.all, sty.freeBox__zeXjI)}
-        >
-          <Stack__
-            as={"div"}
-            hasGap={true}
-            className={classNames(projectcss.all, sty.freeBox__obrQc, {
+        <div className={classNames("all", sty.freeBox__zeXjI)}>
+          <div
+            className={classNames("all", sty.freeBox__obrQc, {
               [sty.freeBoxspecialParamType_eventHandler__obrQcmsWcM]:
                 hasVariant($state, "specialParamType", "eventHandler"),
             })}
@@ -488,21 +506,15 @@ function PlasmicParamSection__RenderFunc(props: {
                           sty.textbox__qpBpB
                         )}
                         prefixIcon={
-                          <SearchsvgIcon
-                            className={classNames(
-                              projectcss.all,
-                              sty.svg__ycNij
-                            )}
+                          <SearchSvgIcon
+                            className={classNames("all", sty.svg__ycNij)}
                             role={"img"}
                           />
                         }
                         styleType={["bordered"]}
                         suffixIcon={
-                          <ClosesvgIcon
-                            className={classNames(
-                              projectcss.all,
-                              sty.svg__iA3U
-                            )}
+                          <CloseSvgIcon
+                            className={classNames("all", sty.svg__iA3U)}
                             role={"img"}
                           />
                         }
@@ -533,21 +545,15 @@ function PlasmicParamSection__RenderFunc(props: {
                           sty.textbox___8ZDkV
                         )}
                         prefixIcon={
-                          <SearchsvgIcon
-                            className={classNames(
-                              projectcss.all,
-                              sty.svg__rKRik
-                            )}
+                          <SearchSvgIcon
+                            className={classNames("all", sty.svg__rKRik)}
                             role={"img"}
                           />
                         }
                         styleType={["bordered"]}
                         suffixIcon={
-                          <ClosesvgIcon
-                            className={classNames(
-                              projectcss.all,
-                              sty.svg__iIwRm
-                            )}
+                          <CloseSvgIcon
+                            className={classNames("all", sty.svg__iIwRm)}
                             role={"img"}
                           />
                         }
@@ -578,21 +584,15 @@ function PlasmicParamSection__RenderFunc(props: {
                           sty.textbox__equRj
                         )}
                         prefixIcon={
-                          <SearchsvgIcon
-                            className={classNames(
-                              projectcss.all,
-                              sty.svg___9RteI
-                            )}
+                          <SearchSvgIcon
+                            className={classNames("all", sty.svg___9RteI)}
                             role={"img"}
                           />
                         }
                         styleType={["bordered"]}
                         suffixIcon={
-                          <ClosesvgIcon
-                            className={classNames(
-                              projectcss.all,
-                              sty.svg__dnSl
-                            )}
+                          <CloseSvgIcon
+                            className={classNames("all", sty.svg__dnSl)}
                             role={"img"}
                           />
                         }
@@ -612,12 +612,11 @@ function PlasmicParamSection__RenderFunc(props: {
                   />
                 </React.Fragment>
               ),
-
               value: args.defaultArgs,
             })}
-          </Stack__>
-        </Stack__>
-      </Stack__>
+          </div>
+        </div>
+      </div>
       <LabeledItem
         className={classNames("__wab_instance", sty.labeledItem__v8T1, {
           [sty.labeledItemhideDefaultValue__v8T1O2Rlb]: hasVariant(
@@ -637,13 +636,7 @@ function PlasmicParamSection__RenderFunc(props: {
           ),
         })}
         label={
-          <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__pxpk9
-            )}
-          >
+          <div className={classNames("all", "__wab_text", sty.text__pxpk9)}>
             {"Default Value"}
           </div>
         }
@@ -660,15 +653,15 @@ function PlasmicParamSection__RenderFunc(props: {
               ),
             })}
             prefixIcon={
-              <SearchsvgIcon
-                className={classNames(projectcss.all, sty.svg__t0DBp)}
+              <SearchSvgIcon
+                className={classNames("all", sty.svg__t0DBp)}
                 role={"img"}
               />
             }
             styleType={["bordered"]}
             suffixIcon={
-              <ClosesvgIcon
-                className={classNames(projectcss.all, sty.svg__e2UsG)}
+              <CloseSvgIcon
+                className={classNames("all", sty.svg__e2UsG)}
                 role={"img"}
               />
             }
@@ -693,18 +686,13 @@ function PlasmicParamSection__RenderFunc(props: {
         })}
         label={
           <div
-            className={classNames(
-              projectcss.all,
-              projectcss.__wab_text,
-              sty.text__r3Qg,
-              {
-                [sty.textspecialParamType_localizable__r3QglJaHq]: hasVariant(
-                  $state,
-                  "specialParamType",
-                  "localizable"
-                ),
-              }
-            )}
+            className={classNames("all", "__wab_text", sty.text__r3Qg, {
+              [sty.textspecialParamType_localizable__r3QglJaHq]: hasVariant(
+                $state,
+                "specialParamType",
+                "localizable"
+              ),
+            })}
           >
             {"Preview Value"}
           </div>
@@ -722,15 +710,15 @@ function PlasmicParamSection__RenderFunc(props: {
               ),
             })}
             prefixIcon={
-              <SearchsvgIcon
-                className={classNames(projectcss.all, sty.svg__rKvYf)}
+              <SearchSvgIcon
+                className={classNames("all", sty.svg__rKvYf)}
                 role={"img"}
               />
             }
             styleType={["bordered"]}
             suffixIcon={
-              <ClosesvgIcon
-                className={classNames(projectcss.all, sty.svg__n9QnU)}
+              <CloseSvgIcon
+                className={classNames("all", sty.svg__n9QnU)}
                 role={"img"}
               />
             }
@@ -752,10 +740,21 @@ function PlasmicParamSection__RenderFunc(props: {
           generateStateValueProp($state, ["localizableSwitch", "isChecked"]) ??
           false
         }
-        onChange={(...eventArgs) => {
-          generateStateOnChangeProp($state, ["localizableSwitch", "isChecked"])(
-            eventArgs[0]
-          );
+        onChange={async (...eventArgs: any) => {
+          ((...eventArgs) => {
+            generateStateOnChangeProp($state, [
+              "localizableSwitch",
+              "isChecked",
+            ])(eventArgs[0]);
+          }).apply(null, eventArgs);
+
+          if (
+            eventArgs.length > 1 &&
+            eventArgs[1] &&
+            eventArgs[1]._plasmic_state_init_
+          ) {
+            return;
+          }
         }}
       >
         {"Localizable"}
@@ -779,14 +778,12 @@ function PlasmicParamSection__RenderFunc(props: {
           <div
             data-plasmic-name={"advancedContent"}
             data-plasmic-override={overrides.advancedContent}
-            className={classNames(projectcss.all, sty.advancedContent)}
+            className={classNames("all", sty.advancedContent)}
           />
         </CollapsableSection>
       ) : null}
-      <Stack__
-        as={"div"}
-        hasGap={true}
-        className={classNames(projectcss.all, sty.freeBox__j1TSc, {
+      <div
+        className={classNames("all", sty.freeBox__j1TSc, {
           [sty.freeBoxhidePropType__j1TSc4IfzH]: hasVariant(
             $state,
             "hidePropType",
@@ -799,14 +796,14 @@ function PlasmicParamSection__RenderFunc(props: {
           data-plasmic-override={overrides.cancelBtn}
           className={classNames("__wab_instance", sty.cancelBtn)}
           endIcon={
-            <ChevronDownsvgIcon
-              className={classNames(projectcss.all, sty.svg___0WzAj)}
+            <ChevronDownSvgIcon
+              className={classNames("all", sty.svg___0WzAj)}
               role={"img"}
             />
           }
           startIcon={
-            <ArrowRightsvgIcon
-              className={classNames(projectcss.all, sty.svg___6SZod)}
+            <ArrowRightSvgIcon
+              className={classNames("all", sty.svg___6SZod)}
               role={"img"}
             />
           }
@@ -818,14 +815,14 @@ function PlasmicParamSection__RenderFunc(props: {
           data-plasmic-override={overrides.confirmBtn}
           className={classNames("__wab_instance", sty.confirmBtn)}
           endIcon={
-            <ChevronDownsvgIcon
-              className={classNames(projectcss.all, sty.svg__caNgI)}
+            <ChevronDownSvgIcon
+              className={classNames("all", sty.svg__caNgI)}
               role={"img"}
             />
           }
           startIcon={
-            <ArrowRightsvgIcon
-              className={classNames(projectcss.all, sty.svg__v7Y1W)}
+            <ArrowRightSvgIcon
+              className={classNames("all", sty.svg__v7Y1W)}
               role={"img"}
             />
           }
@@ -833,8 +830,8 @@ function PlasmicParamSection__RenderFunc(props: {
         >
           {"Confirm"}
         </Button>
-      </Stack__>
-    </Stack__>
+      </div>
+    </div>
   ) as React.ReactElement | null;
 }
 
@@ -853,7 +850,6 @@ const PlasmicDescendants = {
     "cancelBtn",
     "confirmBtn",
   ],
-
   name: ["name"],
   paramName: ["paramName"],
   paramType: ["paramType"],
@@ -889,7 +885,6 @@ type NodeOverridesType<T extends NodeNameType> = Pick<
   PlasmicParamSection__OverridesType,
   DescendantsType<T>
 >;
-
 type NodeComponentProps<T extends NodeNameType> =
   // Explicitly specify variants, args, and overrides as objects
   {
@@ -897,15 +892,15 @@ type NodeComponentProps<T extends NodeNameType> =
     args?: PlasmicParamSection__ArgsType;
     overrides?: NodeOverridesType<T>;
   } & Omit<PlasmicParamSection__VariantsArgs, ReservedPropsType> & // Specify variants directly as props
-    /* Specify args directly as props*/ Omit<
-      PlasmicParamSection__ArgsType,
-      ReservedPropsType
-    > &
-    /* Specify overrides for each element directly as props*/ Omit<
+    // Specify args directly as props
+    Omit<PlasmicParamSection__ArgsType, ReservedPropsType> &
+    // Specify overrides for each element directly as props
+    Omit<
       NodeOverridesType<T>,
       ReservedPropsType | VariantPropType | ArgPropType
     > &
-    /* Specify props for the root element*/ Omit<
+    // Specify props for the root element
+    Omit<
       Partial<React.ComponentProps<NodeDefaultElementType[T]>>,
       ReservedPropsType | VariantPropType | ArgPropType | DescendantsType<T>
     >;

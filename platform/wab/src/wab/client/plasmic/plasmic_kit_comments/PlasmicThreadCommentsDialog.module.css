@@ -1,35 +1,29 @@
-.commentsDialogHead:global(.__wab_instance) {
+.root:global(.__wab_instance):global(.__wab_instance) {
+  min-width: 300px;
+}
+.commentsDialogHead:global(.__wab_instance):global(.__wab_instance) {
   max-width: 100%;
 }
-.commentsDialogHeadhover:global(.__wab_instance) {
-  display: none;
+.freeBox__aLeEa {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  align-items: center;
+  justify-content: flex-start;
+  padding-right: var(--token-8b4HJYZr1yuK);
+  padding-left: var(--token-8b4HJYZr1yuK);
 }
 .threadComments:global(.__wab_instance) {
   max-width: 100%;
 }
-.commentPosthover:global(.__wab_instance) {
-  display: flex;
-}
-.freeBox {
+.freeBox___3WKao {
   display: flex;
   flex-direction: row;
   position: relative;
   align-items: stretch;
   justify-content: flex-start;
-  padding: var(--token-8b4HJYZr1yuK);
-}
-.freeBoxhover {
-  padding-top: 0px;
+  padding: var(--token-O2OprmOFWLju) var(--token-8b4HJYZr1yuK);
 }
 .replyForm:global(.__wab_instance) {
-  width: 100%;
-  left: 0px;
-  top: 0px;
-  z-index: 1;
-  position: sticky;
-  min-width: 0;
-}
-.replyFormhover:global(.__wab_instance) {
-  flex-shrink: 0;
-  display: none;
+  position: relative;
 }

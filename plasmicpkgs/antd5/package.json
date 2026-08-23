@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/antd5",
-  "version": "0.0.347",
-  "description": "Plasmic registration calls for antd components",
+  "version": "0.0.369",
+  "description": "Plasmic registration calls for Ant Design v5 components.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/antd5"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/antd.esm.js",
@@ -47,13 +54,13 @@
     }
   ],
   "scripts": {
-    "build": "rollup -c rollup.config.mjs && yarn tsc --emitDeclarationOnly --declaration src/index.ts --incremental --tsBuildInfoFile ./dist/.tsbuildinfo  --skipLibCheck --jsx react --lib dom,esnext --esModuleInterop --strict --outDir ./dist/ && cp ./dist/*.d.ts skinny/ && rm skinny/index.d.ts",
+    "build": "rollup -c rollup.config.mjs && tsc --emitDeclarationOnly --declaration src/index.ts --incremental --tsBuildInfoFile ./dist/.tsbuildinfo  --skipLibCheck --jsx react --lib dom,esnext --esModuleInterop --strict --outDir ./dist/ && cp ./dist/*.d.ts skinny/ && rm skinny/index.d.ts",
     "prepublishOnly": "npm run build",
     "clean": "rm -rf dist/ skinny/*.ts skinny/*.map skinny/*.js",
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build",
     "test-storybook": "test-storybook",
-    "test": "TEST_CWD=`pwd` yarn --cwd=../.. test"
+    "test": "vitest run"
   },
   "dependencies": {
     "antd": "^5.12.7",
@@ -66,15 +73,15 @@
     "@babel/preset-env": "^7.22.15",
     "@babel/preset-react": "^7.22.15",
     "@babel/preset-typescript": "^7.22.15",
-    "@plasmicapp/data-sources": "1.0.9",
-    "@plasmicapp/host": "2.0.4",
-    "@plasmicapp/query": "0.1.84",
-    "@plasmicapp/react-web": "1.0.10",
+    "@plasmicapp/data-sources": "1.0.26",
+    "@plasmicapp/host": "2.0.17",
+    "@plasmicapp/query": "0.1.87",
+    "@plasmicapp/react-web": "1.0.32",
     "@rollup/plugin-commonjs": "^11.0.0",
     "@rollup/plugin-json": "^4.0.0",
     "@rollup/plugin-node-resolve": "^9.0.0",
-    "@types/lodash": "^4.14.200",
-    "@types/node": "^14.0.26",
+    "@types/lodash": "^4.17.25",
+    "@types/node": "^14.18.63",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "glob": "^8.1.0",
@@ -85,7 +92,9 @@
     "rollup": "^3.10.1",
     "rollup-plugin-dts": "^5.0.0",
     "rollup-plugin-esbuild": "^5.0.0",
-    "rollup-plugin-replace-imports": "^1.0.0"
+    "rollup-plugin-replace-imports": "^1.0.0",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "@plasmicapp/data-sources": ">=0.1.0",

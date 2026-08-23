@@ -1,4 +1,6 @@
+import { pickTraceCarrier } from "@/wab/server/util/apm-util";
 import { getCodegenOriginUrl, getCodegenUrl } from "@/wab/shared/urls";
+import { context, propagation } from "@opentelemetry/api";
 import {
   GlobalVariantSpec,
   extractPlasmicQueryDataFromElement,
@@ -31,7 +33,8 @@ export async function genLoaderHtmlBundle(opts: {
     prepass,
   } = opts;
 
-  const codegenUrl = getCodegenUrl();
+  const publicCodegenUrl = getCodegenUrl();
+  const internalCodegenUrl = getCodegenOriginUrl();
   const loader = initPlasmicLoader({
     projects: [
       {
@@ -41,8 +44,8 @@ export async function genLoaderHtmlBundle(opts: {
       },
     ],
     preview: !version,
-    apiHost: getCodegenOriginUrl(),
-    cdnHost: codegenUrl,
+    apiHost: internalCodegenUrl,
+    cdnHost: internalCodegenUrl,
   });
 
   const data = await loader.fetchComponentData({
@@ -95,7 +98,7 @@ export async function genLoaderHtmlBundle(opts: {
     hydrate &&
       React.createElement("script", {
         async: true,
-        src: `${codegenUrl}/static/js/loader-hydrate.js`,
+        src: `${publicCodegenUrl}/static/js/loader-hydrate.js`,
       })
   );
 
@@ -114,7 +117,10 @@ async function main(argv = process.argv) {
     console.info = () => {};
     console.debug = () => {};
     const args = JSON.parse(argv[2]);
-    const { html } = await genLoaderHtmlBundle(args);
+    const { html } = await context.with(
+      propagation.extract(context.active(), pickTraceCarrier(process.env)),
+      () => genLoaderHtmlBundle(args)
+    );
     // Node will wait for the contents to finish writing before exiting, so we don't need to wait on a callback.
     // This is actually safer and simpler than, say, using fs.writeSync(), which does a partial write and requires retrying.
     process.stdout.write(html);

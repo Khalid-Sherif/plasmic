@@ -50,10 +50,10 @@ import {
 import {
   makeCssClassName,
   makeSerializedClassNameRef,
-  serializeClassExpr,
   serializeClassNames,
   serializeClassNamesCall,
   serializeComponentRootResetClasses,
+  serializeGlobalCssClass,
 } from "@/wab/shared/codegen/react-p/class-names";
 import {
   generateCodeComponentsHelpersFromRegistry,
@@ -107,6 +107,7 @@ import {
   getImportedCodeComponentHelperName,
   getImportedComponentName,
   getNormalizedComponentName,
+  getPageSearchParamsUsage,
   getPlatformImportComponents,
   getReactWebNamedImportsForRender,
   getSkeletonModuleFileName,
@@ -117,6 +118,7 @@ import {
   makeComponentCssIdFileName,
   makeComponentRenderIdFileName,
   makeCssFileName,
+  makeCssTaggedPlasmicImport,
   makeDefaultExternalPropsName,
   makeDefaultInlineClassName,
   makeDefaultStyleClassNameBase,
@@ -138,7 +140,6 @@ import {
   makeProjectModuleImports,
   makeRenderFuncName,
   makeRootResetClassName,
-  makeServerPageSkeletonPropsName,
   makeStyleTokensClassNames,
   makeStyleTokensProviderImports,
   makeStylesImports,
@@ -150,6 +151,7 @@ import {
   makeWabHtmlTextClassName,
   maybeCondExpr,
   pagePathConflictsWithAppRouter,
+  projectStyleCssImportName,
   wrapGlobalContexts,
   wrapGlobalProvider,
   wrapInDataCtxReader,
@@ -251,6 +253,7 @@ import {
   hasGlobalActions,
   hasLoginInteractions,
   isCodeComponent,
+  isContextCodeComponent,
   isHostLessCodeComponent,
   isPageComponent,
   tryGetVariantGroupValueFromArg,
@@ -263,6 +266,7 @@ import {
   code as toCode,
 } from "@/wab/shared/core/exprs";
 import { ParamExportType } from "@/wab/shared/core/lang";
+import { walkDependencyTree } from "@/wab/shared/core/project-deps";
 import {
   siteFinalStyleTokens,
   siteFinalStyleTokensAllDeps,
@@ -290,12 +294,12 @@ import {
 import {
   CssVarResolver,
   genTokenVarDataWithVariants,
-  makeAnimationKeyframesRules,
   makeBaseRuleNamer,
   makeCssTokenVarsRuleSets,
   makeDefaultStylesRules,
   makeLayoutVarsRules,
   makeMixinVarsRules,
+  makeProjectAnimationsBlocks,
   makePseudoClassAwareRuleNamer,
   makePseudoElementAwareRuleNamer,
   makeStyleScopeClassName,
@@ -360,6 +364,7 @@ import {
   isKnownStyleTokenRef,
   isKnownTplComponent,
   isKnownTplTag,
+  isKnownVarRef,
   isKnownVirtualRenderExpr,
 } from "@/wab/shared/model/classes";
 import {
@@ -526,7 +531,46 @@ export function exportProjectConfig(
     site,
     `.${makePlasmicTokensClassName(projectId, exportOpts)}`
   );
-  const animationKeyframesRules = makeAnimationKeyframesRules(site);
+
+  // Keyframes live in `plasmic.css` (non-module) so their names stay global.
+  // Per-sequence `--plsmc-anim-<id>: <ident>;` declarations sit inside
+  // `.plasmic_default_styles` (unsuffixed, shared across projects) so a host
+  // component can resolve a keyframe defined in a dep — both projects'
+  // `.plasmic_default_styles` blocks merge in the cascade. Animation IDs
+  // include AnimationSequence uuid so cross-project collisions can't happen.
+  const animationsBlocks = makeProjectAnimationsBlocks(site, resolver);
+  const animationVarsRule = animationsBlocks.varDecls
+    ? `.${makePlasmicDefaultStylesClassName(exportOpts)} {
+${animationsBlocks.varDecls}
+}`
+    : "";
+
+  // Chain direct deps' plasmic.css via @import so a single project-CSS
+  // import (e.g. from _app.tsx on Next.js) transitively loads them all.
+  // The dep path is a best-effort placeholder; the trailing
+  // /* plasmic-import: */ directive lets the plasmic cli re-resolve it at sync time.
+  const depCssImports =
+    exportOpts.targetEnv === "preview"
+      ? // Preview injects dependency CSS imports in its root preview script, so we omit it here.
+        ""
+      : walkDependencyTree(site, "direct")
+          .map((dep) => {
+            const depCssFile = makeProjectCssFileName(
+              dep.projectId as ProjectId,
+              exportOpts
+            );
+            // Loader outputs a flat directory structure with list of modules at same level.
+            const depImportPath =
+              exportOpts.targetEnv === "loader"
+                ? `./${depCssFile}`
+                : `../${L.snakeCase(dep.name)}/${depCssFile}`;
+            return makeCssTaggedPlasmicImport(
+              depImportPath,
+              dep.projectId,
+              projectStyleCssImportName
+            );
+          })
+          .join("\n");
 
   const splitsProviderBundle = makeSplitsProviderBundle(
     site,
@@ -561,18 +605,16 @@ export function exportProjectConfig(
     exportOpts
   );
 
-  return {
-    projectName,
-    projectId,
-    cssFileName: makeProjectCssFileName(projectId, exportOpts),
-    cssRules: `
+  const cssRulesBody = `
+      ${depCssImports}
       ${fontsCss}
       ${cssTokenVarsRules}
       ${cssTokenOverrideVarsRules}
       ${layoutVarsRules}
-      ${animationKeyframesRules}
       ${defaultTagStylesVarsRules}
       ${cssMixinPropVarsRules}
+      ${animationVarsRule}
+      ${animationsBlocks.keyframes}
       ${
         // If we're using CSS modules, defaultcss should be generated inside
         // the projectcss module.
@@ -582,7 +624,12 @@ export function exportProjectConfig(
       }
       ${resetRule}
       ${defaultTagStyles ?? ""}
-    `,
+    `;
+  return {
+    projectName,
+    projectId,
+    cssFileName: makeProjectCssFileName(projectId, exportOpts),
+    cssRules: cssRulesBody,
     revision,
     projectRevId,
     version,
@@ -773,6 +820,66 @@ export function exportReactPresentational(
     hasServerQueries,
   };
 
+  const isCodeComponentStub =
+    opts.codeComponentStubs &&
+    isCodeComponent(component) &&
+    !isHostLessCodeComponent(component);
+  const componentName = makePlasmicComponentName(component);
+  const styleImportName = makeCssFileName(
+    opts.idFileNames ? makeComponentCssIdFileName(component) : componentName,
+    opts
+  );
+
+  return {
+    id: component.uuid,
+    componentName: getExportedComponentName(component),
+    plasmicName: getNormalizedComponentName(component),
+    displayName: component.name,
+    // Code component stubs only render a skeleton without render/css modules.
+    renderModule: isCodeComponentStub
+      ? ""
+      : serializeRenderModule(ctx, referencedComponents),
+    skeletonModule: isCodeComponentStub
+      ? serializeSkeletonCodeComponentStub(ctx, opts)
+      : serializeSkeletonWrapperTs(ctx, opts),
+    cssRules: isCodeComponentStub ? "" : serializeCssRules(ctx),
+    renderModuleFileName: `${
+      opts.idFileNames
+        ? makeComponentRenderIdFileName(component)
+        : componentName
+    }.tsx`,
+    skeletonModuleFileName: getSkeletonModuleFileName(component, opts),
+    cssFileName: styleImportName,
+    scheme: "blackbox",
+    nameInIdToUuid: {},
+    isPage,
+    isGlobalContextProvider: component.codeComponentMeta?.isContext ?? false,
+    plumeType: component.plumeInfo?.type,
+    path: component.pageMeta?.path,
+    ...(ctx.exportOpts.codeComponentStubs
+      ? { isCode: isCodeComponent(component) }
+      : {}),
+    ...(isPage && {
+      pageMetadata: makePageMetadataOutput(ctx),
+    }),
+    metadata: component.metadata,
+    rscMetadata: getRscMetadata(ctx),
+  };
+}
+
+/**
+ * Serializes the Plasmic* render module for a component: the presentational
+ * module carrying the design's render function, the variants/args/overrides
+ * types, and the component css imports.
+ */
+function serializeRenderModule(
+  ctx: SerializerBaseContext,
+  referencedComponents: Component[]
+) {
+  const { component, site, siteCtx, projectConfig } = ctx;
+  const opts = ctx.exportOpts;
+  const isPage = isPageComponent(component);
+
   const projectModuleBundle = ensure(
     projectConfig.projectModuleBundle,
     "projectModuleBundle missing"
@@ -795,7 +902,6 @@ export function exportReactPresentational(
   const renderFunc = serializeRenderFunc(ctx, referencedComponents);
   const descendantsLookup = serializeDescendantsLookup(ctx);
   const nodeComponents = serializeNodeComponents(ctx);
-  const skeletonModule = serializeSkeletonWrapperTs(ctx, opts);
   const { customFunctionsAndLibsImport, serializedCustomFunctionsAndLibs } =
     serializeCustomFunctionsAndLibs(ctx);
 
@@ -810,10 +916,6 @@ export function exportReactPresentational(
   );
 
   const componentName = makePlasmicComponentName(component);
-  const styleImportName = makeCssFileName(
-    opts.idFileNames ? makeComponentCssIdFileName(component) : componentName,
-    opts
-  );
   const plumeType = component.plumeInfo?.type as PlumeType | undefined;
   const plumePlugin = getPlumeCodegenPlugin(component);
 
@@ -861,7 +963,7 @@ const __wrapUserPromise = globalThis.__PlasmicWrapUserPromise ?? (async (loc, pr
   // we append a "__" suffix in case there's any name collision with other
   // components that we may be importing into this file. We don't need
   // to worry about non-components, as we don't expect name collisions there.
-  const renderModule = `
+  return `
 /* eslint-disable */
 /* tslint:disable */
 // @ts-nocheck
@@ -913,7 +1015,7 @@ ${
 }
 ${
   ctx.hasServerQueries
-    ? `import { unstable_usePlasmicQueries } from "${getDataSourcesPackageName()}";`
+    ? `import { usePlasmicQueries } from "${getDataSourcesPackageName()}";`
     : ""
 }
 ${ctx.hasServerQueries && !ctx.useRSC ? makeDataSourcesQueryTypeImports() : ""}
@@ -1038,37 +1140,6 @@ ${opts.platform === "tanstack" ? serializeTanStackHead(ctx, component) : ""}
 export default ${componentName};
 /* prettier-ignore-end */
 `;
-
-  return {
-    id: component.uuid,
-    componentName: getExportedComponentName(component),
-    plasmicName: getNormalizedComponentName(component),
-    displayName: component.name,
-    renderModule,
-    skeletonModule,
-    rscMetadata: getRscMetadata(ctx),
-    cssRules: serializeCssRules(ctx),
-    renderModuleFileName: `${
-      opts.idFileNames
-        ? makeComponentRenderIdFileName(component)
-        : componentName
-    }.tsx`,
-    skeletonModuleFileName: getSkeletonModuleFileName(component, opts),
-    cssFileName: styleImportName,
-    scheme: "blackbox",
-    nameInIdToUuid: {},
-    isPage,
-    isGlobalContextProvider: component.codeComponentMeta?.isContext ?? false,
-    plumeType: component.plumeInfo?.type,
-    path: component.pageMeta?.path,
-    ...(ctx.exportOpts.codeComponentStubs
-      ? { isCode: isCodeComponent(component) }
-      : {}),
-    ...(isPage && {
-      pageMetadata: makePageMetadataOutput(ctx),
-    }),
-    metadata: component.metadata,
-  };
 }
 
 /**
@@ -1252,10 +1323,7 @@ export function renderPage(
     // with `min-height: 100vh` and stretching children.  See
     // https://coda.io/d/Plasmic-Wiki_dHQygjmQczq/Scaffolding-to-render-full-viewport-components_su2po#_luKso
     renderBody = `
-      <div className={${serializeClassExpr(
-        ctx.exportOpts,
-        "plasmic_page_wrapper"
-      )}}>
+      <div className={${serializeGlobalCssClass("plasmic_page_wrapper")}}>
         ${makeChildrenStr([renderBody])}
       </div>
     `;
@@ -1396,7 +1464,7 @@ export function serializeComponentLocalVars(ctx: SerializerBaseContext) {
     ${
       component.states.length
         ? `const stateSpecs: Parameters<typeof useDollarState>[0] = React.useMemo(() =>
-          (${serializeStateSpecs(component, ctx)})
+          (${serializeStateSpecs(component, ctx, { forLegacyQueries: true })})
         , [$props, $ctx, $refs]);`
         : ""
     }${
@@ -1411,11 +1479,11 @@ export function serializeComponentLocalVars(ctx: SerializerBaseContext) {
           ? "const $stateRef = React.useRef<Record<string, unknown> | null>(null);"
           : ""
       }
-      const $q = unstable_usePlasmicQueries(${
+      const $q = usePlasmicQueries(${
         useRscServerWrapper && isPage ? "pageQueryTree" : "serverQueryTree"
-      }, $ctx, $props, ${
+      }, { $ctx, $props, $state: ${
           component.states.length ? "$stateRef.current" : "null"
-        });
+        } });
       `
       : ""
   }
@@ -2686,24 +2754,34 @@ function serializePageAwareSkeletonWrapperTs(
   }
   if (isNextJs) {
     if (ctx.useRSC) {
-      const skeletonPropsName = makeServerPageSkeletonPropsName(component);
-      componentPropsSig = `{ params, searchParams }: ${skeletonPropsName}`;
+      componentPropsSig = `{ params, searchParams }: PlasmicPageProps`;
       componentBodyPrefix = `const ctx = await makeAppRouterPageCtx({ params, searchParams });`;
       serverExports = serializeAppRouterGenerateMetadata(ctx);
       if (isDynamicRoute) {
         serverExports = `${serializeAppRouterGenerateStaticParamsSkeleton()}\n${serverExports}`;
       }
+      // When a page only reads `$ctx.query` in the render tree, makeAppRouterPageCtx keeps
+      // `query` empty so the page is statically generated, and we opt into `trackQueryParams`
+      // so they resolve from the browser on client. If `$ctx.query` is read on the server for
+      // metadata/server queries they get real values from `searchParams` and the page is
+      // rendered dynamically.
+      const searchParamsUsage = getPageSearchParamsUsage(component);
+      const trackQueryParams =
+        searchParamsUsage.inRenderTree && !searchParamsUsage.outsideRenderTree;
+      const pageParamsProviderProps = [
+        `route={ctx.pageRoute}`,
+        `params={ctx.params}`,
+        `query={ctx.query}`,
+        ...(trackQueryParams ? [`trackQueryParams`] : []),
+      ].join("\n        ");
       content = `<PageParamsProvider__
-        route={ctx.pageRoute}
-        params={ctx.params}
-        query={ctx.query}
+        ${pageParamsProviderProps}
       >
         ${content}
       </PageParamsProvider__>`;
       plasmicModuleImports.push(
         "makeAppRouterPageCtx",
-        "generateDynamicMetadata",
-        skeletonPropsName
+        "generateDynamicMetadata"
       );
       if (ctx.hasServerQueries) {
         plasmicModuleImports.push("serverQueryTree");
@@ -2756,7 +2834,7 @@ function serializePageAwareSkeletonWrapperTs(
           params: (params ?? {}) as Record<string, string | string[] | undefined>,
           query: (deps.search ?? {}) as Record<string, string | string[] | undefined>,
         };
-        const { cache: prefetchedCache } = await unstable_executePlasmicQueries(
+        const { cache: prefetchedCache } = await executePlasmicQueries(
           serverQueryTree,
           { $props: {}, $ctx }
         );
@@ -2893,6 +2971,53 @@ function serializePageAwareSkeletonWrapperTs(
   `;
 }
 
+/**
+ * Serializes the skeleton module for a user's code component stub.
+ * Renders its children for a context component or an empty fragment otherwise.
+ */
+function serializeSkeletonCodeComponentStub(
+  ctx: SerializerBaseContext,
+  opts: ExportOpts
+) {
+  const { component } = ctx;
+  const componentName = getExportedComponentName(component);
+
+  const componentSubstitutionApi = opts.useComponentSubstitutionApi
+    ? `import { components } from "@plasmicapp/loader-runtime-registry";
+
+    let __hasWarnedMissingCodeComponent = false;
+
+    export function getPlasmicComponent() {
+      if (!components["${
+        component.uuid
+      }"] && !__hasWarnedMissingCodeComponent) {
+        console.warn("Warning: Code component ${getComponentDisplayName(
+          component
+        )} is not registered. Make sure to call \`PLASMIC.registerComponent\` for all used code components in your page.");
+        __hasWarnedMissingCodeComponent = true;
+      }
+      return components["${component.uuid}"] ?? ${componentName};
+    }`
+    : "";
+
+  return `
+    // This module is auto-generated by Plasmic; please do not edit!
+    import * as React from "react";
+
+    const ${componentName} = ${
+    isContextCodeComponent(component)
+      ? `(props) => <React.Fragment>{props.children}</React.Fragment>;`
+      : `() => <React.Fragment />;`
+  }
+
+    ${componentSubstitutionApi}
+
+    ${serializeCodeComponentHelperRegistry(ctx, opts)}
+
+    export default ${componentName};
+  `;
+}
+
 function serializeSkeletonWrapperTs(
   ctx: SerializerBaseContext,
   opts: ExportOpts
@@ -2918,38 +3043,15 @@ function serializeSkeletonWrapperTs(
   const componentSubstitutionApi = opts.useComponentSubstitutionApi
     ? `import { components } from "@plasmicapp/loader-runtime-registry";
 
-    ${
-      isCodeComponent(component) && !isHostLessCodeComponent(component)
-        ? "let __hasWarnedMissingCodeComponent = false;"
-        : ""
-    }
-
     export function getPlasmicComponent() {
-      ${
-        isCodeComponent(component) && !isHostLessCodeComponent(component)
-          ? `if (!components["${
-              component.uuid
-            }"] && !__hasWarnedMissingCodeComponent) {
-        console.warn("Warning: Code component ${getComponentDisplayName(
-          component
-        )} is not registered. Make sure to call \`PLASMIC.registerComponent\` for all used code components in your page.");
-        __hasWarnedMissingCodeComponent = true;
-      }`
-          : ""
-      }
       return components["${component.uuid}"] ?? ${componentName};
     }`
     : "";
 
-  const codeComponentHelperRegistry =
-    opts.useCodeComponentHelpersRegistry &&
-    isCodeComponentWithHelpers(component)
-      ? `import { codeComponentHelpers } from "@plasmicapp/loader-runtime-registry";
-
-    export function getCodeComponentHelper() {
-      return codeComponentHelpers["${component.uuid}"];
-    }`
-      : "";
+  const codeComponentHelperRegistry = serializeCodeComponentHelperRegistry(
+    ctx,
+    opts
+  );
 
   if (isPageComponent(component) && isPageAwarePlatform(opts.platform)) {
     return serializePageAwareSkeletonWrapperTs(
@@ -3041,6 +3143,20 @@ function serializeSkeletonWrapperTs(
     `
     }
   `;
+}
+
+function serializeCodeComponentHelperRegistry(
+  ctx: SerializerBaseContext,
+  opts: ExportOpts
+) {
+  return opts.useCodeComponentHelpersRegistry &&
+    isCodeComponentWithHelpers(ctx.component)
+    ? `import { codeComponentHelpers } from "@plasmicapp/loader-runtime-registry";
+
+    export function getCodeComponentHelper() {
+      return codeComponentHelpers["${ctx.component.uuid}"];
+    }`
+    : "";
 }
 
 function makeCodegenRuleNamer(ctx: SerializerBaseContext) {
@@ -3230,7 +3346,11 @@ function conditionalComponentArgs(
         }
       } else {
         variantArgNames.add(varName);
-        if (isKnownCustomCode(arg.expr) || isKnownObjectPath(arg.expr)) {
+        if (
+          isKnownCustomCode(arg.expr) ||
+          isKnownObjectPath(arg.expr) ||
+          isKnownVarRef(arg.expr)
+        ) {
           entry.push([arg.expr, vs.variants]);
         } else if (r.vg.multi) {
           entry.push([

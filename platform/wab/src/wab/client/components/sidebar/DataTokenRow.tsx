@@ -9,12 +9,15 @@ import {
 } from "@/wab/client/components/sidebar/token-utils";
 import { Matcher } from "@/wab/client/components/view-common";
 import { useStudioCtx } from "@/wab/client/studio-ctx/StudioCtx";
+import { UiActionsOverlay } from "@/wab/client/studio-ctx/ui/studio-ui-actions";
+import { mkModelUiId } from "@/wab/client/studio-ctx/ui/studio-ui-ids";
 import { DataTokenValue, isDataTokenEditable } from "@/wab/commons/DataToken";
 import { spawn } from "@/wab/shared/common";
 import { FinalToken, MutableToken } from "@/wab/shared/core/tokens";
 import { DataToken } from "@/wab/shared/model/classes";
 import { Menu } from "antd";
 import { observer } from "mobx-react";
+import { ok } from "neverthrow";
 import React from "react";
 
 const DataTokenRow = observer(function _DataTokenRow(props: {
@@ -32,9 +35,9 @@ const DataTokenRow = observer(function _DataTokenRow(props: {
 
   const onFindReferences = () => {
     spawn(
-      studioCtx.change(({ success }) => {
+      studioCtx.change(() => {
         studioCtx.findReferencesDataToken = token.base;
-        return success();
+        return ok();
       })
     );
   };
@@ -104,24 +107,28 @@ const DataTokenRow = observer(function _DataTokenRow(props: {
     }
   }, [multiAssetsActions, token.uuid]);
 
-  const onClickHandler = multiAssetsActions.isSelecting
-    ? onToggle
-    : !tokenPanelReadOnly && isDataTokenEditable(token)
-    ? () => onSelect(token)
-    : undefined;
+  const openEditor =
+    !tokenPanelReadOnly && isDataTokenEditable(token)
+      ? () => onSelect(token)
+      : undefined;
+
+  const onClickHandler = multiAssetsActions.isSelecting ? onToggle : openEditor;
 
   return (
-    <GeneralDataTokenControl
-      style={{
-        height: TOKEN_ROW_HEIGHT,
-        paddingLeft: getLeftPadding(indentMultiplier),
-      }}
-      token={token}
-      tokenValue={tokenValue}
-      matcher={matcher}
-      menu={overlay}
-      onClick={onClickHandler}
-    />
+    <>
+      <GeneralDataTokenControl
+        style={{
+          height: TOKEN_ROW_HEIGHT,
+          paddingLeft: getLeftPadding(indentMultiplier),
+        }}
+        token={token}
+        tokenValue={tokenValue}
+        matcher={matcher}
+        menu={overlay}
+        onClick={onClickHandler}
+      />
+      <UiActionsOverlay uiId={mkModelUiId(token.base)} />
+    </>
   );
 });
 

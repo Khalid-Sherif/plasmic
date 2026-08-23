@@ -1,62 +1,92 @@
-import xml from "xml";
+export type XmlAttrs = Record<string, string>;
 
-export type XmlObject = xml.XmlObject;
-export type XmlElement = xml.XmlObject;
-export type XmlAttrs = xml.XmlAttrs;
+/** An XML tree node: an element, or a text/CDATA leaf. */
+export type XmlNode =
+  | XmlElement
+  | { type: "text"; text: string }
+  | { type: "cdata"; cdata: string };
 
-/**
- * Creates an XML object with consistent indentation.
- *
- * The XML spec does not require `"` or `'` to be escaped in text content;
- * only `&` and `<` are mandatory there. The underlying `xml` package
- * over-escapes defensively, emitting `&quot;` and `&apos;` everywhere.
- * We rewrite those back to their literal characters so the output reads
- * cleanly when consumed as LLM context (especially for embedded JSON
- * payloads). Attribute values, where `"` escaping is required, are left
- * alone.
- *
- * Assumes that we won't have output with CDATA or XML comments; either would break
- * the regex below. We can switch to other library with proper spec escaping
- * (e.g. xmlbuilder2) if that changes.
- */
-export function toXml(content: XmlObject | XmlObject[]): string {
-  return unescapeTextEntities(xml(content, { indent: "  " }));
+export interface XmlElement {
+  type: "element";
+  name: string;
+  attributes?: XmlAttrs;
+  elements: XmlNode[];
+  /**
+   * Render this element's subtree without pretty-printing. Used for rich
+   * text blocks, where an indentation newline between text and a nested
+   * inline element would reimport as a visible space.
+   */
+  noPrettyPrint?: boolean;
 }
 
-function unescapeTextEntities(serialized: string): string {
-  // Match every `>…<` region, i.e. text content between tags. Attribute
-  // values sit inside `<…>` and can't contain a literal `<`, so the regex
-  // never reaches them.
-  return serialized.replace(/>([^<]*)</g, (_m, text: string) => {
-    const unescaped = text.replace(/&quot;/g, '"').replace(/&apos;/g, "'");
-    return `>${unescaped}<`;
-  });
+/** A child of an element: a nested element or literal text content. */
+export type XmlChild = XmlElement | string;
+
+/**
+ * Builds an element node with the given attributes and children. String
+ * children are wrapped as text nodes; nested elements are passed through.
+ */
+export function mkXmlElement(
+  name: string,
+  attrs: XmlAttrs,
+  children: XmlChild[] = []
+): XmlElement {
+  return {
+    type: "element",
+    name,
+    attributes: attrs,
+    elements: children.map((child) =>
+      typeof child === "string" ? { type: "text", text: child } : child
+    ),
+  };
 }
 
 /**
- * Formats a multi-line text string so it renders cleanly as the text
- * content of an XML element at the given depth of indentation.
- *
- * For example, embedding a 3-line block under a `<foo>` that sits 2 levels
- * deep produces:
- *<ancestor>
- *  <parent>
- *    <foo>
- *      line 1
- *      line 2
- *      line 3
- *    </foo>
- *  </parent>
- *</ancestor>
+ * Serializes an element to an XML string, indented by `spaces` (0 = single line).
+ * Text/CDATA children render inline, element children on their own indented lines,
+ * and childless elements as `<tag></tag>` (not self-closing). Escapes `&`/`<`/`>`
+ * in text and the quoting char in attribute values.
  */
-export function indentXmlTextBlock(text: string, depth: number): string {
-  const INDENT = "  ";
-  const innerIndent = INDENT.repeat(depth + 1);
-  const parentIndent = INDENT.repeat(depth);
-  const body = text
-    .split("\n")
-    .map((line) => (line.length > 0 ? innerIndent + line : line))
-    .join("\n");
+export function toXml(el: XmlElement, opts: { spaces?: number } = {}): string {
+  return writeElement(el, opts.spaces ?? 2, 0);
+}
 
-  return `\n${body}\n${parentIndent}`;
+function writeElement(el: XmlElement, spaces: number, depth: number): string {
+  const attrs = Object.entries(el.attributes ?? {})
+    .map(([name, value]) => ` ${name}=${quoteAttr(value)}`)
+    .join("");
+  const childSpaces = el.noPrettyPrint ? 0 : spaces;
+  const indent = (d: number) =>
+    childSpaces > 0 ? "\n" + " ".repeat(childSpaces * d) : "";
+  const children = el.elements;
+  const parts = children.map((child) =>
+    child.type === "element"
+      ? indent(depth + 1) + writeElement(child, childSpaces, depth + 1)
+      : child.type === "cdata"
+      ? `<![CDATA[${child.cdata}]]>`
+      : escapeText(child.text)
+  );
+  const closeIndent = children.some((child) => child.type === "element")
+    ? indent(depth)
+    : "";
+  return `<${el.name}${attrs}>${parts.join("")}${closeIndent}</${el.name}>`;
+}
+
+/**
+ * Quotes an attribute value, preferring single quotes when the value contains
+ * `"` (e.g. the data-props JSON blob) so it reads without `&quot;` escaping.
+ * The write side parses with DOMParser, which accepts either quote style.
+ */
+function quoteAttr(value: string): string {
+  if (value.includes('"') && !value.includes("'")) {
+    return `'${value}'`;
+  }
+  return `"${value.replace(/"/g, "&quot;")}"`;
+}
+
+function escapeText(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }

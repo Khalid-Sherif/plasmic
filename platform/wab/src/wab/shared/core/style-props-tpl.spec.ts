@@ -1,10 +1,13 @@
+import { RSH } from "@/wab/shared/RuleSetHelpers";
+import { mkVariant, mkVariantSetting } from "@/wab/shared/Variants";
 import { CodeComponentsRegistry } from "@/wab/shared/code-components/code-components";
+import { mkShortId } from "@/wab/shared/common";
 import { ComponentType, mkComponent } from "@/wab/shared/core/components";
 import {
   isBackgroundValidForTpl,
-  isFlexContainerPropValidForTpl,
-  isGapPropValidForTpl,
-  isGridContainerPropValidForTpl,
+  isFlexContainerPropValidForRsh,
+  isGapPropValidForRsh,
+  isGridContainerPropValidForRsh,
   isListStyleValidForTpl,
   isMarginValidForTpl,
   isOverflowValidForTpl,
@@ -15,15 +18,32 @@ import {
   isTransitionValidForTpl,
   isTypographyValidForTpl,
   isValidStylePropForTpl,
+  validateStylesForTpl,
 } from "@/wab/shared/core/style-props-tpl";
+import { mkRuleSet } from "@/wab/shared/core/styles";
 import { TplTagType, mkTplComponent, mkTplTagX } from "@/wab/shared/core/tpls";
-import { CodeComponentMeta } from "@/wab/shared/model/classes";
+import { EffectiveVariantSetting } from "@/wab/shared/effective-variant-setting";
+import { CodeComponentMeta, Mixin } from "@/wab/shared/model/classes";
 import {
   TEST_GLOBAL_VARIANT,
   mkTestVariantSetting as vs,
 } from "@/wab/test/tpls";
 
 const ccRegistry = new CodeComponentsRegistry(globalThis, {});
+
+/** Ruleset helper over a plain div carrying the given styles. */
+const rsh = (styles: Record<string, string> = {}) =>
+  RSH(vs(styles).rs, mkTplTagX("div"));
+
+const mkTestMixin = (styles: Record<string, string>) =>
+  new Mixin({
+    name: "TestMixin",
+    rs: mkRuleSet({ values: styles }),
+    preview: undefined,
+    uuid: mkShortId(),
+    forTheme: false,
+    variantedRs: [],
+  });
 
 describe("isTypographyValidForTpl", () => {
   it("is true for containers, text nodes, code components", () => {
@@ -56,17 +76,28 @@ describe("isSizeValidForTpl", () => {
 
 describe("isPositioningValidForTpl", () => {
   it("is true for non-root tags, components", () => {
-    expect(isPositioningValidForTpl(mkTplTagX("div"), vs())).toBe(true);
-    expect(isPositioningValidForTpl(mkPlainComponentTpl(), vs())).toBe(true);
-    expect(isPositioningValidForTpl(mkCodeComponentTpl(), vs())).toBe(true);
+    expect(isPositioningValidForTpl(mkTplTagX("div"), rsh())).toBe(true);
+    expect(isPositioningValidForTpl(mkPlainComponentTpl(), rsh())).toBe(true);
+    expect(isPositioningValidForTpl(mkCodeComponentTpl(), rsh())).toBe(true);
   });
   it("is false for columns", () => {
     expect(
       isPositioningValidForTpl(
         mkTplTagX("div", { type: TplTagType.Column }),
-        vs()
+        rsh()
       )
     ).toBe(false);
+  });
+  it("is true for a component root that has a position", () => {
+    const component = mkComponent({
+      name: "TestRoot",
+      type: ComponentType.Plain,
+      tplTree: mkTplTagX("div"),
+    });
+    expect(isPositioningValidForTpl(component.tplTree, rsh())).toBe(false);
+    expect(
+      isPositioningValidForTpl(component.tplTree, rsh({ position: "absolute" }))
+    ).toBe(true);
   });
 });
 
@@ -142,6 +173,171 @@ describe("isMarginValidForTpl", () => {
   });
 });
 
+describe("validateStylesForTpl", () => {
+  const styles = {
+    marginTop: "10px",
+    marginLeft: "20px",
+    color: "red",
+    display: "flex",
+  };
+
+  it("keeps all styles valid for a regular tag", () => {
+    expect(
+      validateStylesForTpl(styles, mkTplTagX("div"), rsh(), ccRegistry)
+    ).toEqual({
+      valid: styles,
+      invalid: {},
+    });
+  });
+
+  it("splits out margin styles for a component root", () => {
+    const component = mkComponent({
+      name: "TestRoot",
+      type: ComponentType.Plain,
+      tplTree: mkTplTagX("div"),
+    });
+    expect(
+      validateStylesForTpl(styles, component.tplTree, rsh(), ccRegistry)
+    ).toEqual({
+      valid: { color: "red", display: "flex" },
+      invalid: { marginTop: "10px", marginLeft: "20px" },
+    });
+  });
+
+  it("splits out all restricted styles for a column", () => {
+    expect(
+      validateStylesForTpl(
+        styles,
+        mkTplTagX("div", { type: TplTagType.Column }),
+        rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: {},
+      invalid: styles,
+    });
+  });
+
+  it("splits out typography styles other than color for an icon", () => {
+    expect(
+      validateStylesForTpl(
+        { color: "red", fontSize: "16px", opacity: "0.5" },
+        mkIconTpl(),
+        rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: { color: "red", opacity: "0.5" },
+      invalid: { fontSize: "16px" },
+    });
+  });
+
+  it("splits out non-positioning styles for a plain component instance", () => {
+    expect(
+      validateStylesForTpl(
+        {
+          width: "100px",
+          marginTop: "10px",
+          background: "red",
+          fontSize: "16px",
+        },
+        mkPlainComponentTpl(),
+        rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: { width: "100px", marginTop: "10px" },
+      invalid: { background: "red", fontSize: "16px" },
+    });
+  });
+
+  it("validates state-dependent styles against the post-merge ruleset", () => {
+    expect(
+      validateStylesForTpl(
+        { display: "flex", flexDirection: "column", rowGap: "8px" },
+        mkTplTagX("div"),
+        rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: { display: "flex", flexDirection: "column", rowGap: "8px" },
+      invalid: {},
+    });
+  });
+
+  it("validates state-dependent styles against the whole variant stack", () => {
+    // The stack is a flex column in base and the styles target a screen
+    // variant that does not restate display/flex-direction.
+    const tpl = mkTplTagX("div");
+    tpl.vsettings = [
+      vs({ display: "flex", "flex-direction": "column" }),
+      mkVariantSetting({ variants: [mkVariant({ name: "Tablet" })] }),
+    ];
+    expect(
+      validateStylesForTpl(
+        { rowGap: "8px" },
+        tpl,
+        new EffectiveVariantSetting(tpl, tpl.vsettings).rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: { rowGap: "8px" },
+      invalid: {},
+    });
+  });
+
+  it("validates state-dependent styles against mixin styles", () => {
+    // The tpl is a flex column only because of a mixin applied to it.
+    const tpl = mkTplTagX("div");
+    const mixin = mkTestMixin({
+      display: "flex",
+      "flex-direction": "column",
+    });
+    const baseVs = vs();
+    baseVs.rs.mixins = [mixin];
+    tpl.vsettings = [baseVs];
+    expect(
+      validateStylesForTpl(
+        { rowGap: "8px" },
+        tpl,
+        new EffectiveVariantSetting(tpl, tpl.vsettings).rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: { rowGap: "8px" },
+      invalid: {},
+    });
+  });
+
+  it("splits out empty values as invalid", () => {
+    expect(
+      validateStylesForTpl(
+        { color: "", marginTop: "10px" },
+        mkTplTagX("div"),
+        rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: { marginTop: "10px" },
+      invalid: { color: "" },
+    });
+  });
+
+  it("splits out flex styles when the tpl is not a flex container", () => {
+    expect(
+      validateStylesForTpl(
+        { flexDirection: "column" },
+        mkTplTagX("div"),
+        rsh(),
+        ccRegistry
+      )
+    ).toEqual({
+      valid: {},
+      invalid: { flexDirection: "column" },
+    });
+  });
+});
+
 describe("isPaddingValidForTpl", () => {
   it("is true for non-image tags, code components", () => {
     expect(isPaddingValidForTpl(mkTplTagX("div"), ccRegistry)).toBe(true);
@@ -171,111 +367,115 @@ describe("isPaddingValidForTpl", () => {
   });
 });
 
-describe("isFlexContainerPropValidForTpl", () => {
+describe("isFlexContainerPropValidForRsh", () => {
   it("is true for flex containers", () => {
     expect(
-      isFlexContainerPropValidForTpl(
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" })
+      isFlexContainerPropValidForRsh(
+        rsh({ display: "flex", "flex-direction": "row" })
       )
     ).toBe(true);
     expect(
-      isFlexContainerPropValidForTpl(
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "column" })
+      isFlexContainerPropValidForRsh(
+        rsh({ display: "flex", "flex-direction": "column" })
       )
     ).toBe(true);
   });
   it("is false for grid, block", () => {
-    expect(
-      isFlexContainerPropValidForTpl(mkTplTagX("div"), vs({ display: "grid" }))
-    ).toBe(false);
-    expect(isFlexContainerPropValidForTpl(mkTplTagX("div"), vs())).toBe(false);
+    expect(isFlexContainerPropValidForRsh(rsh({ display: "grid" }))).toBe(
+      false
+    );
+    expect(isFlexContainerPropValidForRsh(rsh())).toBe(false);
   });
 });
 
-describe("isGridContainerPropValidForTpl", () => {
+describe("isGridContainerPropValidForRsh", () => {
   it("is true for grid containers", () => {
-    expect(
-      isGridContainerPropValidForTpl(mkTplTagX("div"), vs({ display: "grid" }))
-    ).toBe(true);
+    expect(isGridContainerPropValidForRsh(rsh({ display: "grid" }))).toBe(true);
   });
   it("is false for flex, block", () => {
     expect(
-      isGridContainerPropValidForTpl(
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" })
+      isGridContainerPropValidForRsh(
+        rsh({ display: "flex", "flex-direction": "row" })
       )
     ).toBe(false);
-    expect(isGridContainerPropValidForTpl(mkTplTagX("div"), vs())).toBe(false);
+    expect(isGridContainerPropValidForRsh(rsh())).toBe(false);
   });
 });
 
-describe("isGapPropValidForTpl", () => {
+describe("isGapPropValidForRsh", () => {
   it("is true for gap along main axis, both axes when wrapped, both axes for grid", () => {
     expect(
-      isGapPropValidForTpl(
+      isGapPropValidForRsh(
         "column-gap",
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" })
+        rsh({ display: "flex", "flex-direction": "row" })
       )
     ).toBe(true);
     expect(
-      isGapPropValidForTpl(
+      isGapPropValidForRsh(
         "row-gap",
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "column" })
+        rsh({ display: "flex", "flex-direction": "column" })
       )
     ).toBe(true);
 
-    const wrapVs = vs({
+    const wrapRsh = rsh({
       display: "flex",
       "flex-direction": "row",
       "flex-wrap": "wrap",
     });
-    expect(isGapPropValidForTpl("column-gap", mkTplTagX("div"), wrapVs)).toBe(
-      true
-    );
-    expect(isGapPropValidForTpl("row-gap", mkTplTagX("div"), wrapVs)).toBe(
-      true
-    );
+    expect(isGapPropValidForRsh("column-gap", wrapRsh)).toBe(true);
+    expect(isGapPropValidForRsh("row-gap", wrapRsh)).toBe(true);
 
-    const gridVs = vs({ display: "grid" });
-    expect(isGapPropValidForTpl("column-gap", mkTplTagX("div"), gridVs)).toBe(
-      true
-    );
-    expect(isGapPropValidForTpl("row-gap", mkTplTagX("div"), gridVs)).toBe(
-      true
-    );
+    const gridRsh = rsh({ display: "grid" });
+    expect(isGapPropValidForRsh("column-gap", gridRsh)).toBe(true);
+    expect(isGapPropValidForRsh("row-gap", gridRsh)).toBe(true);
   });
   it("is false for gap along cross axis without wrap, unknown gap prop", () => {
     expect(
-      isGapPropValidForTpl(
+      isGapPropValidForRsh(
         "column-gap",
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "column" })
+        rsh({ display: "flex", "flex-direction": "column" })
       )
     ).toBe(false);
     expect(
-      isGapPropValidForTpl(
+      isGapPropValidForRsh(
         "row-gap",
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" })
+        rsh({ display: "flex", "flex-direction": "row" })
       )
     ).toBe(false);
     expect(
-      isGapPropValidForTpl(
+      isGapPropValidForRsh(
         "gap",
-        mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" })
+        rsh({ display: "flex", "flex-direction": "row" })
       )
     ).toBe(false);
+  });
+  it("is true for a variant that inherits the flex state it depends on", () => {
+    // A stack is a flex row in the base variant and the targeted variant does
+    // not override display/flex-direction, so the gap must stay valid there.
+    const stack = mkTplTagX("div");
+    const tabletVs = mkVariantSetting({
+      variants: [mkVariant({ name: "Tablet" })],
+    });
+    stack.vsettings = [
+      vs({ display: "flex", "flex-direction": "row", "column-gap": "14px" }),
+      tabletVs,
+    ];
+
+    expect(isGapPropValidForRsh("column-gap", RSH(tabletVs.rs, stack))).toBe(
+      false
+    );
+    expect(
+      isGapPropValidForRsh(
+        "column-gap",
+        new EffectiveVariantSetting(stack, stack.vsettings).rsh()
+      )
+    ).toBe(true);
   });
 });
 
 describe("isValidStylePropForTpl", () => {
   it("is true for valid prop+element combinations", () => {
-    const baseVs = vs();
+    const baseVs = rsh();
     // typography
     expect(
       isValidStylePropForTpl("color", mkTplTagX("div"), baseVs, ccRegistry)
@@ -386,10 +586,21 @@ describe("isValidStylePropForTpl", () => {
     ).toBe(true);
     // layout
     expect(
+      isValidStylePropForTpl("display", mkTplTagX("div"), baseVs, ccRegistry)
+    ).toBe(true);
+    expect(
+      isValidStylePropForTpl(
+        "display",
+        mkCodeComponentTpl(),
+        baseVs,
+        ccRegistry
+      )
+    ).toBe(true);
+    expect(
       isValidStylePropForTpl(
         "flex-direction",
         mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" }),
+        rsh({ display: "flex", "flex-direction": "row" }),
         ccRegistry
       )
     ).toBe(true);
@@ -397,7 +608,7 @@ describe("isValidStylePropForTpl", () => {
       isValidStylePropForTpl(
         "grid-template-columns",
         mkTplTagX("div"),
-        vs({ display: "grid" }),
+        rsh({ display: "grid" }),
         ccRegistry
       )
     ).toBe(true);
@@ -405,18 +616,18 @@ describe("isValidStylePropForTpl", () => {
       isValidStylePropForTpl(
         "column-gap",
         mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" }),
+        rsh({ display: "flex", "flex-direction": "row" }),
         ccRegistry
       )
     ).toBe(true);
   });
 
   it("is false for inapplicable prop+element combinations, invalid props", () => {
-    const baseVs = vs();
-    // typography on icon
+    const baseVs = rsh();
+    // typography on icon (except color, which has its dedicated control)
     expect(
       isValidStylePropForTpl("color", mkIconTpl(), baseVs, ccRegistry)
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isValidStylePropForTpl("font-size", mkIconTpl(), baseVs, ccRegistry)
     ).toBe(false);
@@ -479,9 +690,25 @@ describe("isValidStylePropForTpl", () => {
     // layout mismatch
     expect(
       isValidStylePropForTpl(
+        "display",
+        mkPlainComponentTpl(),
+        baseVs,
+        ccRegistry
+      )
+    ).toBe(false);
+    expect(
+      isValidStylePropForTpl(
+        "display",
+        mkTplTagX("span", { type: TplTagType.Text }),
+        baseVs,
+        ccRegistry
+      )
+    ).toBe(false);
+    expect(
+      isValidStylePropForTpl(
         "flex-direction",
         mkTplTagX("div"),
-        vs({ display: "grid" }),
+        rsh({ display: "grid" }),
         ccRegistry
       )
     ).toBe(false);
@@ -489,7 +716,7 @@ describe("isValidStylePropForTpl", () => {
       isValidStylePropForTpl(
         "flex-direction",
         mkTplTagX("span", { type: TplTagType.Text }),
-        vs({ display: "flex" }),
+        rsh({ display: "flex" }),
         ccRegistry
       )
     ).toBe(false);
@@ -497,7 +724,7 @@ describe("isValidStylePropForTpl", () => {
       isValidStylePropForTpl(
         "grid-template-columns",
         mkTplTagX("div"),
-        vs({ display: "flex", "flex-direction": "row" }),
+        rsh({ display: "flex", "flex-direction": "row" }),
         ccRegistry
       )
     ).toBe(false);
@@ -521,7 +748,7 @@ describe("isValidStylePropForTpl", () => {
   });
 
   it("respects code component styleSections for visibility/opacity", () => {
-    const baseVs = vs();
+    const baseVs = rsh();
     // styleSections: false disables everything
     const disabledRegistry = mkCcRegistry("AllDisabled", {
       styleSections: false,

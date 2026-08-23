@@ -30,7 +30,7 @@ import { _useStyleTokens } from "./PlasmicStyleTokensProvider"; // plasmic-impor
 
 import "@plasmicapp/react-web/lib/plasmic.css";
 
-import projectcss from "./plasmic_plasmic_kit_data_binding.module.css"; // plasmic-import: w2GXN278dkQ2gQTVQnPehW/projectcss
+import "./plasmic_plasmic_kit_data_binding.css"; // plasmic-import: w2GXN278dkQ2gQTVQnPehW/projectcss
 import sty from "./PlasmicChatMessage.module.css"; // plasmic-import: 6Cb3e8nRgrBg/css
 
 createPlasmicElementProxy;
@@ -46,20 +46,17 @@ export const PlasmicChatMessage__VariantProps = new Array<VariantPropType>(
   "type"
 );
 
-export type PlasmicChatMessage__ArgsType = { responseSlot?: React.ReactNode };
+export type PlasmicChatMessage__ArgsType = { children?: React.ReactNode };
 type ArgPropType = keyof PlasmicChatMessage__ArgsType;
-export const PlasmicChatMessage__ArgProps = new Array<ArgPropType>(
-  "responseSlot"
-);
+export const PlasmicChatMessage__ArgProps = new Array<ArgPropType>("children");
 
 export type PlasmicChatMessage__OverridesType = {
-  root?: Flex__<"div">;
+  row?: Flex__<"div">;
   message?: Flex__<"div">;
-  content?: Flex__<"div">;
 };
 
 export interface DefaultChatMessageProps {
-  responseSlot?: React.ReactNode;
+  children?: React.ReactNode;
   type?: SingleChoiceArg<"user" | "assistant">;
   className?: string;
 }
@@ -105,6 +102,7 @@ function PlasmicChatMessage__RenderFunc(props: {
     ],
     [$props, $ctx, $refs]
   );
+
   const $state = useDollarState(stateSpecs, {
     $props,
     $ctx,
@@ -117,84 +115,56 @@ function PlasmicChatMessage__RenderFunc(props: {
 
   return (
     <div
-      data-plasmic-name={"root"}
-      data-plasmic-override={overrides.root}
+      data-plasmic-name={"row"}
+      data-plasmic-override={overrides.row}
       data-plasmic-root={true}
       data-plasmic-for-node={forNode}
       className={classNames(
-        projectcss.all,
-        projectcss.root_reset,
-        projectcss.plasmic_default_styles,
-        projectcss.plasmic_mixins,
+        "all",
+        "root_reset_w2GXN278dkQ2gQTVQnPehW",
+        "plasmic_default_styles",
+        "plasmic_mixins",
         styleTokensClassNames,
-        sty.root,
+        sty.row,
         {
-          [sty.roottype_assistant]: hasVariant($state, "type", "assistant"),
-          [sty.roottype_user]: hasVariant($state, "type", "user"),
+          [sty.rowtype_assistant]: hasVariant($state, "type", "assistant"),
+          [sty.rowtype_user]: hasVariant($state, "type", "user"),
         }
       )}
     >
       <div
         data-plasmic-name={"message"}
         data-plasmic-override={overrides.message}
-        className={classNames(projectcss.all, sty.message, {
+        className={classNames("all", sty.message, {
           [sty.messagetype_assistant]: hasVariant($state, "type", "assistant"),
           [sty.messagetype_user]: hasVariant($state, "type", "user"),
         })}
       >
-        <div
-          data-plasmic-name={"content"}
-          data-plasmic-override={overrides.content}
-          className={classNames(projectcss.all, sty.content, {
-            [sty.contenttype_assistant]: hasVariant(
-              $state,
-              "type",
-              "assistant"
-            ),
-            [sty.contenttype_user]: hasVariant($state, "type", "user"),
-          })}
-        >
-          {renderPlasmicSlot({
-            defaultContents: (
-              <div
-                className={classNames(
-                  projectcss.all,
-                  projectcss.__wab_text,
-                  sty.text__eCdm
-                )}
-              >
-                {
-                  "Sure!\nThis feature helps you understand what\u2019s happening at each step. It gives you clear feedback, highlights important actions, and makes it easier to move forward without getting stuck."
-                }
-              </div>
-            ),
-            value: args.responseSlot,
-            className: classNames(sty.slotTargetResponseSlot, {
-              [sty.slotTargetResponseSlottype_assistant]: hasVariant(
-                $state,
-                "type",
-                "assistant"
-              ),
-            }),
-          })}
-        </div>
+        {renderPlasmicSlot({
+          defaultContents: (
+            <div className={classNames("all", "__wab_text", sty.text__eCdm)}>
+              {
+                "Sure!\nThis feature helps you understand what\u2019s happening at each step. It gives you clear feedback, highlights important actions, and makes it easier to move forward without getting stuck."
+              }
+            </div>
+          ),
+          value: args.children,
+        })}
       </div>
     </div>
   ) as React.ReactElement | null;
 }
 
 const PlasmicDescendants = {
-  root: ["root", "message", "content"],
-  message: ["message", "content"],
-  content: ["content"],
+  row: ["row", "message"],
+  message: ["message"],
 } as const;
 type NodeNameType = keyof typeof PlasmicDescendants;
 type DescendantsType<T extends NodeNameType> =
   (typeof PlasmicDescendants)[T][number];
 type NodeDefaultElementType = {
-  root: "div";
+  row: "div";
   message: "div";
-  content: "div";
 };
 
 type ReservedPropsType = "variants" | "args" | "overrides";
@@ -245,7 +215,7 @@ function makeNodeComponent<NodeName extends NodeNameType>(nodeName: NodeName) {
       forNode: nodeName,
     });
   };
-  if (nodeName === "root") {
+  if (nodeName === "row") {
     func.displayName = "PlasmicChatMessage";
   } else {
     func.displayName = `PlasmicChatMessage.${nodeName}`;
@@ -255,11 +225,10 @@ function makeNodeComponent<NodeName extends NodeNameType>(nodeName: NodeName) {
 
 export const PlasmicChatMessage = Object.assign(
   // Top-level PlasmicChatMessage renders the root element
-  makeNodeComponent("root"),
+  makeNodeComponent("row"),
   {
     // Helper components rendering sub-elements
     message: makeNodeComponent("message"),
-    content: makeNodeComponent("content"),
 
     // Metadata about props expected for PlasmicChatMessage
     internalVariantProps: PlasmicChatMessage__VariantProps,

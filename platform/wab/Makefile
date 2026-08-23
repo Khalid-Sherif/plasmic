@@ -15,13 +15,13 @@ all: \
 	src/wab/gen/static/styles/prismjs-css.txt \
 
 src/wab/shared/model/classes.ts: src/wab/gen/modelPegParser.js src/wab/shared/model/model-schema.ts tools/gen-models.ts src/wab/shared/model/model-generator.ts
-	yarn gen:models
+	pnpm gen:models
 src/wab/shared/model/classes-metas.ts: src/wab/gen/modelPegParser.js src/wab/shared/model/model-schema.ts tools/gen-models.ts src/wab/shared/model/model-generator.ts
-	yarn gen:models
-src/wab/styles/_tokens.sass: src/wab/styles/plasmic-tokens.theo.json
-	yarn gen:plasmic-tokens-sass
-src/wab/styles/_tokens.ts: src/wab/styles/plasmic-tokens.theo.json
-	yarn gen:plasmic-tokens-ts
+	pnpm gen:models
+src/wab/styles/_tokens.sass: src/wab/styles/plasmic-tokens.theo.json tools/gen-theo.ts
+	pnpm gen:plasmic-tokens-sass
+src/wab/styles/_tokens.ts: src/wab/styles/plasmic-tokens.theo.json tools/gen-theo.ts
+	pnpm gen:plasmic-tokens-ts
 src/wab/styles/css-variables.ts: src/wab/styles/css-variables.json
 	node src/wab/styles/css-variables.gen.js
 src/wab/styles/css-variables.scss: src/wab/styles/css-variables.json
@@ -29,19 +29,21 @@ src/wab/styles/css-variables.scss: src/wab/styles/css-variables.json
 
 src/wab/gen/GridStyleParser.js: PEGJS_FLAGS = --allowed-start-rules axisTemplate,size,atomicSize,numSize,flexibleSize
 src/wab/gen/cssPegParser.js: PEGJS_FLAGS = --allowed-start-rules backgroundLayer,backgroundImage,boxShadows,boxShadow,commaSepValues,spaceSepValues
+# A grammar initializer can only reach a module by referencing it from PEGJS_PREAMBLE:
+# it runs inside the parser, where a require() would bypass the bundler's aliases.
+src/wab/gen/cssPegParser.js: PEGJS_PREAMBLE = import * as bgStylesMod from "@/wab/shared/core/bg-styles";
+
+# PEG.js 0.10 emits CommonJS at best, so rewrite its export into an ES module.
+WRAP_PEG_PARSER = { echo '/* eslint-disable */'; echo '$(PEGJS_PREAMBLE)'; sed 's/^module\.exports = {$$/const parser = {/' $@.tmp; echo 'export const { SyntaxError, parse } = parser;'; echo 'export default parser;'; } > $@ && rm $@.tmp
 
 src/wab/gen/%.js: %.pegjs
-	./node_modules/.bin/pegjs -o $@ $(PEGJS_FLAGS) $<
-	echo '/* eslint-disable */' > $@.tmp
-	cat $@ >> $@.tmp
-	mv $@.tmp $@
+	./node_modules/.bin/pegjs -o $@.tmp $(PEGJS_FLAGS) $<
+	$(WRAP_PEG_PARSER)
 src/wab/gen/%.js: %.pegcoffee
-	./node_modules/.bin/pegjs --plugin pegjs-coffee-plugin -o $@ $(PEGJS_FLAGS) $<
-	echo '/* eslint-disable */' > $@.tmp
-	cat $@ >> $@.tmp
-	mv $@.tmp $@
+	./node_modules/.bin/pegjs --plugin pegjs-coffee-plugin -o $@.tmp $(PEGJS_FLAGS) $<
+	$(WRAP_PEG_PARSER)
 public/static/img/%.svg: export/%.svg tools/clean-svg.ts
-	yarn clean-svg
+	pnpm clean-svg
 
 src/wab/gen/static/styles/react-web-css.txt: node_modules/@plasmicapp/react-web/lib/plasmic.css
 	mkdir -p src/wab/gen/static/styles && cp ./node_modules/@plasmicapp/react-web/lib/plasmic.css src/wab/gen/static/styles/react-web-css.txt

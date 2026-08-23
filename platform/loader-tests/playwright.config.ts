@@ -23,8 +23,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry in CI only */
   retries: process.env.CI ? 1 : 0,
-  /* The `undefined` (default) number of workers is chosen based on the number of CPUs. */
-  workers: undefined,
+  workers: process.env.CI ? 6 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI
     ? [["github"], ["playwright-ctrf-json-reporter", {}]]
@@ -42,8 +41,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.WAB_HOST ?? "http://localhost:3003",
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: "retain-on-failure",
-    video: "retain-on-failure",
+    trace: process.env.CI ? "on-first-retry" : "retain-on-failure",
+    video: process.env.CI ? "on-first-retry" : "retain-on-failure",
     ignoreHTTPSErrors: true,
     bypassCSP: true,
   },
@@ -57,9 +56,15 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
+        channel: "chromium",
         headless,
         launchOptions: {
-          args: ["--disable-web-security"],
+          args: [
+            "--disable-web-security",
+            ...(process.env.PLAYWRIGHT_CHROMIUM_ARGS?.split(" ").filter(
+              Boolean
+            ) ?? []),
+          ],
         },
       },
     },

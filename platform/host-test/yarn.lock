@@ -167,21 +167,21 @@
   resolved "https://registry.yarnpkg.com/@nolyfill/is-core-module/-/is-core-module-1.0.39.tgz#3dc35ba0f1e66b403c00b39344f870298ebb1c8e"
   integrity sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==
 
-"@plasmicapp/host@^2.0.4":
-  version "2.0.4"
-  resolved "https://registry.yarnpkg.com/@plasmicapp/host/-/host-2.0.4.tgz#c32ff2d86805eb9535638fc01c4657cdcf86b3e5"
-  integrity sha512-jwUU1IaKUz1FrFmFnHRmcMXUfSNkWeX6k6RACzYsHLwHYt38ladgOu9nd2xygpUO3rOAE0r+ZxrYL5jVP3QXuQ==
+"@plasmicapp/host@^2.0.17":
+  version "2.0.17"
+  resolved "https://registry.yarnpkg.com/@plasmicapp/host/-/host-2.0.17.tgz#fd9f09d27d8ee7a62ae51ea2b4a5872b3895e8fa"
+  integrity sha512-WQMkK5xCuPvkngK0lxrBv5si38TqNdKbVJyMqFHwFv61YMTPUt44yjwD43RbuBbXBgg0nI2LAwc49B7ch/zd/g==
   dependencies:
-    "@plasmicapp/query" "0.1.84"
+    "@plasmicapp/query" "0.1.87"
     csstype "^3.1.2"
     window-or-global "^1.0.1"
 
-"@plasmicapp/query@0.1.84":
-  version "0.1.84"
-  resolved "https://registry.yarnpkg.com/@plasmicapp/query/-/query-0.1.84.tgz#d7ad0a411243ea972d1e88049e8f47faf9f6763b"
-  integrity sha512-mOgXmccl82cSSX4DMOGisCUYb9+pPSPsQqUJ0OfTkrTz+bsNbluTjIGIFwGtvQZiBXMP2c7/MGrxtqXtt/qzLw==
+"@plasmicapp/query@0.1.87":
+  version "0.1.87"
+  resolved "https://registry.yarnpkg.com/@plasmicapp/query/-/query-0.1.87.tgz#5179bd931d6ee54d7bbe7f47d845e0f81ab936ea"
+  integrity sha512-4M4QvE9IE8DtVv/LuEruGkMLo3bPhTZIwrYpQpcaXj6FQCL2G5XdhjhcH6JzSW2LxqjhyC+2xDLlZKUAzYqpvw==
   dependencies:
-    swr "^1.0.0"
+    swr "^1.3.0"
 
 "@rtsao/scc@^1.1.0":
   version "1.1.0"
@@ -2370,7 +2370,7 @@ supports-preserve-symlinks-flag@^1.0.0:
   resolved "https://registry.yarnpkg.com/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
-swr@^1.0.0:
+swr@^1.3.0:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/swr/-/swr-1.3.0.tgz#c6531866a35b4db37b38b72c45a63171faf9f4e8"
   integrity sha512-dkghQrOl2ORX9HYrMDtPa7LTVHJjCTeZoB1dqTbnnEDlSvN8JEKpYIYurDfvbQFUUS8Cg8PceFVZNkW0KNNYPw==

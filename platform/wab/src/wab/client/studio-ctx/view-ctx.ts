@@ -17,10 +17,12 @@ import { requestIdleCallbackAsync } from "@/wab/client/requestidlecallback";
 import {
   FreestyleState,
   PointerState,
+  RightTabKey,
   StudioCtx,
 } from "@/wab/client/studio-ctx/StudioCtx";
 import { ViewportCtx } from "@/wab/client/studio-ctx/ViewportCtx";
 import { ComponentCtx } from "@/wab/client/studio-ctx/component-ctx";
+import { getRenderState } from "@/wab/client/studio-ctx/renderState";
 import { trackEvent } from "@/wab/client/tracking";
 import { ViewStateSnapshot } from "@/wab/client/undo-log";
 import { drainQueue } from "@/wab/commons/asyncutil";
@@ -36,7 +38,6 @@ import {
   allCustomFunctions,
   getLinkedCodeProps,
 } from "@/wab/shared/cached-selectors";
-import { customFunctionId } from "@/wab/shared/code-components/code-components";
 import {
   arrayEq,
   assert,
@@ -66,6 +67,7 @@ import {
 } from "@/wab/shared/core/components";
 import { getRawCode } from "@/wab/shared/core/exprs";
 import { metaSvc } from "@/wab/shared/core/metas";
+import { customFunctionId } from "@/wab/shared/core/query-ids";
 import { SQ, Selectable } from "@/wab/shared/core/selection";
 import { makeTokenRefResolver } from "@/wab/shared/core/site-style-tokens";
 import { isTplAttachedToSite } from "@/wab/shared/core/sites";
@@ -125,6 +127,7 @@ import L, { defer, groupBy, head, isEqual, sortBy } from "lodash";
 import * as mobx from "mobx";
 import { comparer, computed, observable } from "mobx";
 import { computedFn } from "mobx-utils";
+import { ok } from "neverthrow";
 import * as React from "react";
 import { CSSProperties } from "react";
 import type { Editor as SlateEditor } from "slate";
@@ -195,18 +198,32 @@ export class ViewCtx extends WithDbCtx {
     return this._nextFocusedTpl;
   }
 
-  private _highlightParam = observable.box<
+  private _highlightParams = observable.box<
     | {
-        param: Param;
+        params: Param[];
         tpl: TplComponent;
       }
     | undefined
   >(undefined);
-  get highlightParam() {
-    return this._highlightParam.get();
+  private _highlightParamsDispose: (() => void) | undefined;
+  get highlightParams() {
+    return this._highlightParams.get();
   }
-  set highlightParam(val: { param: Param; tpl: TplComponent } | undefined) {
-    this._highlightParam.set(val);
+  set highlightParams(val: { params: Param[]; tpl: TplComponent } | undefined) {
+    this._highlightParamsDispose?.();
+
+    this._highlightParams.set(val);
+
+    if (val) {
+      const timer = setTimeout(() => {
+        this._highlightParamsDispose = undefined;
+        mobx.runInAction(() => this._highlightParams.set(undefined));
+      }, 2000);
+      this._highlightParamsDispose = () => {
+        clearTimeout(timer);
+        this._highlightParamsDispose = undefined;
+      };
+    }
   }
 
   _triggerEditingTextDataPicker = observable.box<boolean | null>(null);
@@ -727,6 +744,7 @@ export class ViewCtx extends WithDbCtx {
    */
   dispose() {
     this.disposals.forEach((d) => d());
+    this._highlightParamsDispose?.();
     this._editingTextResizeObserver?.disconnect();
     this.canvasObservers.forEach(
       (reaction) => !reaction.isDisposed && reaction.dispose()
@@ -797,9 +815,11 @@ export class ViewCtx extends WithDbCtx {
       this.setEditingTextContext(null);
 
       // While rich-text editing, the focus will be on the frame. We reset
-      // it to document.body when done.
-      if (document.activeElement && document.activeElement !== document.body) {
-        (document.activeElement as HTMLElement).blur();
+      // it to document.body when done. This runs async (queued change), so
+      // only blur frames — the user may have already focused e.g. a side
+      // pane input, and we must not steal its focus.
+      if (document.activeElement instanceof HTMLIFrameElement) {
+        document.activeElement.blur();
       }
     });
   }
@@ -920,7 +940,13 @@ export class ViewCtx extends WithDbCtx {
   }
 
   get renderState() {
-    return this.csEvaluator.renderState;
+    // dispose() nulls out csEvaluator to break cyclic references, but lingering mobx
+    // reactions and deferred canvas callbacks can still read renderState while a frame is
+    // being torn down (e.g. tpl-tree remap on a rich-text save). RenderState lives in a
+    // frame-keyed registry independent of csEvaluator, so fall back to it.
+    return (
+      this.csEvaluator?.renderState ?? getRenderState(this.arenaFrame().uid)
+    );
   }
 
   /**
@@ -968,6 +994,11 @@ export class ViewCtx extends WithDbCtx {
   }
 
   setTriggerEditingTextDataPicker(x: boolean | null) {
+    // The DataPicker is rendered by the TypogrpahySection.
+    // Make sure TypographySection is rendered on the settings tab.
+    if (x) {
+      this.studioCtx.switchRightTab(RightTabKey.settings);
+    }
     this._triggerEditingTextDataPicker.set(x);
   }
 
@@ -1246,6 +1277,11 @@ export class ViewCtx extends WithDbCtx {
   private async syncInternal(optss: ViewCtxSyncArgs[]) {
     const opts = this.mergeEvalArgs(optss);
     const doEval = async () => {
+      if (this._isDisposed) {
+        // The queue may still hold syncs scheduled before disposal.
+        // csEvaluator is gone by now, so there's nothing left to evaluate.
+        return;
+      }
       console.log(
         `${this.tplMgr().describeArenaFrame(this.arenaFrame())}: Eval ${
           opts.asap ? "sync" : "async"
@@ -1265,12 +1301,12 @@ export class ViewCtx extends WithDbCtx {
           defer(async () => {
             if (!this.isDisposed) {
               await this.studioCtx.change(
-                ({ success }) => {
+                () => {
                   if (!this.isDisposed) {
                     this.csEvaluator.runPostEvalTasks();
                     this.updateCtxPostChange();
                   }
-                  return success();
+                  return ok();
                 },
                 {
                   noUndoRecord: true,

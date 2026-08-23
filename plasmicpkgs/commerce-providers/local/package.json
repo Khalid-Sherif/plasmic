@@ -1,7 +1,14 @@
 {
   "name": "@plasmicpkgs/commerce-local",
-  "version": "0.0.245",
-  "description": "Plasmic registration calls for local provider components",
+  "version": "0.0.258",
+  "description": "Local mock data provider for Plasmic commerce components.",
+  "homepage": "https://www.plasmic.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/plasmicapp/plasmic.git",
+    "directory": "plasmicpkgs/commerce-providers/local"
+  },
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "dist/commerce-local.esm.js",
@@ -18,12 +25,12 @@
     "analyze": "size-limit --why"
   },
   "dependencies": {
-    "@plasmicpkgs/commerce": "0.0.245"
+    "@plasmicpkgs/commerce": "0.0.258"
   },
   "devDependencies": {
-    "@plasmicapp/host": "2.0.4",
-    "@types/js-cookie": "^3.0.1",
-    "@types/node": "^14.0.26",
+    "@plasmicapp/host": "2.0.17",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^14.18.63",
     "@types/react": "^18",
     "js-cookie": "^3.0.1",
     "react": "^18.2.0",

@@ -81,7 +81,7 @@ export const FAKE_CSS_PROPS = [
 // want for all elements.
 //
 // Tags by content category are listed here, currently used for display prop: https://developer.mozilla.org/en-US/docs/Web/Guide/HTML/Content_categories#Phrasing_content
-export const cssInitialsOverrides = {
+const cssInitialsOverrides = {
   display: {
     img: "inline-block",
     li: "list-item",
@@ -106,13 +106,13 @@ export const cssInitialsOverrides = {
   // For these form elements, need to override their text properties to `inherit` so
   // that they can take their styles from the component root
   "font-family": {
-    "input textarea button code pre span p i em strong": "inherit",
+    "input textarea button code pre span p b i em strong": "inherit",
   },
   "line-height": {
-    "input textarea button code pre span p i em strong": "inherit",
+    "input textarea button code pre span p b i em strong": "inherit",
   },
   "font-size": {
-    "input textarea button h1 h2 h3 h4 h5 h6 span p i em strong": "inherit",
+    "input textarea button h1 h2 h3 h4 h5 h6 span p b i em strong": "inherit",
   },
   "font-style": {
     "address button input textarea span p": "inherit",
@@ -121,10 +121,10 @@ export const cssInitialsOverrides = {
     "h1 h2 h3 h4 h5 h6 button input textarea span p i em": "inherit",
   },
   color: {
-    "a input textarea button span p i em strong": "inherit",
+    "a input textarea button span p b i em strong": "inherit",
   },
   "text-transform": {
-    "input textarea button span p i em strong": "inherit",
+    "input textarea button span p b i em strong": "inherit",
   },
   "background-image": {
     button: "none",
@@ -542,7 +542,7 @@ export function expandGapProperty(gapValue: string, isGrid: boolean = false) {
 export function parseShorthandProperties(
   property: ShorthandProperty,
   valueNode: Value
-) {
+): Record<string, string> {
   const value = generate(valueNode);
   const parts = parseCssShorthand(value);
 

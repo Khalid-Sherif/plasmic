@@ -160,8 +160,11 @@ function NewPageModal(props: NewPageModalProps) {
               placeholder: "Describe the page you want to create...",
               rows: 3,
               autoFocus: true,
-              onChange: (value) =>
-                setPageInfo((prev) => ({ ...prev, prompt: value ?? "" })),
+              onChange: (e) =>
+                setPageInfo((prev) => ({
+                  ...prev,
+                  prompt: e.target.value ?? "",
+                })),
             }}
           />
         </NewComponentSection>
@@ -214,7 +217,10 @@ function NewPageModal(props: NewPageModalProps) {
                         }
                         const route = APP_ROUTES.projectFullPreview.pattern
                           .replace(":projectId", comp.projectId)
-                          .replace(":previewPath*", template.component.uuid);
+                          .replace(
+                            "{/*previewPath}",
+                            `/${template.component.uuid}`
+                          );
                         window.open(route, "_blank");
                       }}
                     />
