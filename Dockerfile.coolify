@@ -41,9 +41,9 @@ ENV PUPPETEER_SKIP_DOWNLOAD=1
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
     PUBLIC_URL=${PUBLIC_URL} pnpm run setup:sub && \
     pnpm run setup:react-web-bundle && \
-    mkdir -p /plasmic/platform/wab/node_modules/.bin && \
-    ln -sf /plasmic/node_modules/.bin/pegjs /plasmic/platform/wab/node_modules/.bin/pegjs && \
-    ln -sf /plasmic/node_modules/.bin/pegjs-coffee-plugin /plasmic/platform/wab/node_modules/.bin/pegjs-coffee-plugin && \
+    pnpm run setup:wab && \
+    sed -i 's|\./node_modules/\.bin/pegjs|/plasmic/node_modules/.bin/pegjs|g' /plasmic/platform/wab/Makefile && \
+    sed -i 's|\./node_modules/\.bin/pegjs-coffee-plugin|/plasmic/node_modules/.bin/pegjs-coffee-plugin|g' /plasmic/platform/wab/Makefile && \
     PUBLIC_URL=${PUBLIC_URL} pnpm run make
 
 RUN cd /plasmic/platform/wab && pnpm add -D raw-loader
