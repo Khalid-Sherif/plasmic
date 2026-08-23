@@ -17,8 +17,8 @@ RUN apk add --no-cache \
 # Enable yarn via corepack (strictly required for Node 24+)
 RUN corepack enable && corepack prepare yarn@stable --activate
 
-# Copy only dependency files first for caching
-COPY package.json yarn.lock ./
+# Copy dependency files first for caching
+COPY package.json yarn.lock pnpm-workspace.yaml ./
 
 # Install root deps (installs the whole workspace and correctly links binaries)
 RUN yarn install --network-timeout 600000
@@ -39,13 +39,16 @@ ENV NODE_OPTIONS=--max_old_space_size=2048
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
-# Explicitly run the build steps that work.
-# We skip live-frame, loader-html-hydrate, and canvas-packages as they are known to fail in Docker.
-# We also bypass package.json scripts to avoid hardcoded 'pnpm' commands.
+# Run build steps explicitly to ensure yarn is used and avoid any hardcoded 'pnpm' in package.json scripts
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
     cd /plasmic/platform/sub && yarn build && \
     cd /plasmic/platform/react-web-bundle && yarn build && \
-    cd /plasmic/platform/wab && make
+    cd /plasmic/platform/live-frame && yarn build && \
+    cd /plasmic/platform/loader-bundle-env && yarn build && \
+    cd /plasmic/platform/loader-html-hydrate && yarn build && cp build/* ../wab/public/static/js/ && \
+    cd /plasmic/platform/wab && make && \
+    cd /plasmic/platform/canvas-packages && yarn build && \
+    cd /plasmic && PUBLIC_URL=${PUBLIC_URL} yarn make
 
 RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
 RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
