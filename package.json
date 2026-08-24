@@ -30,7 +30,7 @@
     "setup-all": "pnpm setup && pnpm setup:canvas-packages && cd platform/wab && pnpm typeorm migration:run && pnpm migrate-dev-bundles && pnpm plume:dev update",
     "setup:canvas-packages": "cd platform/canvas-packages && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000 && yarn build",
     "setup:live-frame": "cd platform/live-frame && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000 && yarn build",
-    "setup:loader-bundle-env": "cd platform/loader-bundle-env && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000 && yarn build",
+    "setup:loader-bundle-env": "cd platform/loader-bundle-env && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000",
     "setup:loader-html-hydrate": "cd platform/loader-html-hydrate && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000 && yarn build && cp build/* ../wab/public/static/js/",
     "setup:react-web-bundle": "cd platform/react-web-bundle && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000 && yarn build",
     "setup:sub": "cd platform/sub && yarn install --prefer-offline --network-concurrency 1 --network-timeout 600000 && yarn build",
