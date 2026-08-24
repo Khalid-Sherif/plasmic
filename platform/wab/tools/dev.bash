@@ -14,5 +14,4 @@ main() {
   'cd ../loader-html-hydrate/; nice -n +30 pnpm build &' \
   'nice -n +30 pnpm backend'
 }
-
 main
