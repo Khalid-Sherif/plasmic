@@ -24,7 +24,8 @@ ENV COREPACK_ENABLE_STRICT=0
 COPY package.json yarn.lock pnpm-workspace.yaml ./
 
 # Install root deps (installs the whole workspace and correctly links root binaries)
-RUN yarn install --network-timeout 600000
+# Using --prefer-offline and high timeout to prevent network drops
+RUN yarn install --prefer-offline --network-timeout 600000
 
 # Copy rest of the app
 COPY . .
@@ -43,7 +44,8 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
 # Use the package.json scripts.
-# Because we updated them in Step 1, they now use 'yarn' and have built-in 10-minute network timeouts.
+# Because we updated them in Step 1, they now use 'yarn' with --prefer-offline,
+# single-threaded network concurrency, and built-in 10-minute network timeouts.
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
     PUBLIC_URL=${PUBLIC_URL} yarn setup:sub && \
     yarn setup:react-web-bundle && \
