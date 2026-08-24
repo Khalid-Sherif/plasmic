@@ -2,6 +2,8 @@
 FROM node:24-alpine AS builder
 WORKDIR /plasmic
 
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
 RUN apk add --no-cache \
     bash \
     git \
@@ -39,7 +41,7 @@ ARG REACT_APP_DEFAULT_HOST_URL
 ENV REACT_APP_DEFAULT_HOST_URL=${REACT_APP_DEFAULT_HOST_URL}
 
 # Run setup steps individually to control memory usage
-ENV NODE_OPTIONS=--max_old_space_size=2048
+ENV NODE_OPTIONS="--max-old-space-size=2048 --dns-result-order=ipv4first"
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
@@ -61,6 +63,8 @@ RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
 
 # --- Final stage ---
 FROM node:24-alpine AS runtime
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 RUN addgroup -S plasmic && \
     adduser -S plasmic -G plasmic && \
