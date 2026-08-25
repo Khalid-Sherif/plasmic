@@ -1,64 +1,65 @@
 services:
-  plasmic-db:
-    image: postgres:15-alpine
-    restart: always
-    environment:
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_DB=${DB_NAME}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'pg_isready -U ${DB_USER} -d ${DB_NAME}'
-      interval: 5s
-      timeout: 10s
-      retries: 5
+   plasmic-db:
+      image: postgres:15-alpine
+      restart: always
+      environment:
+         - POSTGRES_PASSWORD=${DB_PASSWORD}
+         - POSTGRES_USER=${DB_USER}
+         - POSTGRES_DB=${DB_NAME}
+      volumes:
+         - postgres_data:/var/lib/postgresql/data
+      healthcheck:
+         test:
+            - CMD-SHELL
+            - 'pg_isready -U ${DB_USER} -d ${DB_NAME}'
+         interval: 5s
+         timeout: 10s
+         retries: 5
 
-  plasmic-wab:
-    build:
-      context: .
-      dockerfile: Dockerfile.coolify
-      target: runtime
-      args:
-        - PUBLIC_URL=${PUBLIC_URL}
-        - REACT_APP_DEFAULT_HOST_URL=${CANVAS_URL}
-    restart: always
-    ports:
-      - 3003:3003
-      - 3004:3004
-      - 3005:3005
-    depends_on:
-      plasmic-db:
-        condition: service_healthy
-    environment:
-      - DATABASE_URI=postgres://${DB_USER}:${DB_PASSWORD}@plasmic-db:5432/${DB_NAME}
-      - WAB_DBNAME=${DB_NAME}
-      - WAB_DBPASSWORD=${DB_PASSWORD}
-      - NODE_ENV=${NODE_ENV}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DATABASE=${DB_NAME}
-      - POSTGRES_HOST=plasmic-db
-      - CHOKIDAR_USEPOLLING=true
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - SESSION_SECRET=${SESSION_SECRET}
-      - HOST=${PUBLIC_URL}
-      - PUBLIC_URL=${PUBLIC_URL}
-      - REACT_APP_DEV_HOST_PROXY=${REACT_APP_DEV_HOST_PROXY}
-      - BACKEND_HOST=${PUBLIC_URL}
-      - NEXT_PUBLIC_HOST=${PUBLIC_URL}
-    tty: true
-    stdin_open: true
+   plasmic-wab:
+      build:
+         context: .
+         dockerfile: Dockerfile.coolify
+         target: runtime
+         args:
+            - PUBLIC_URL=${PUBLIC_URL}
+            - REACT_APP_DEFAULT_HOST_URL=${CANVAS_URL}
+      restart: always
+      ports:
+         - 3003:3003
+         - 3004:3004
+         - 3005:3005
+      depends_on:
+         plasmic-db:
+            condition: service_healthy
+      environment:
+         - DATABASE_URI=postgres://${DB_USER}:${DB_PASSWORD}@plasmic-db:5432/${DB_NAME}
+         - WAB_DBNAME=${DB_NAME}
+         - WAB_DBPASSWORD=${DB_PASSWORD}
+         - NODE_ENV=${NODE_ENV}
+         - POSTGRES_USER=${DB_USER}
+         - POSTGRES_PASSWORD=${DB_PASSWORD}
+         - POSTGRES_DATABASE=${DB_NAME}
+         - POSTGRES_HOST=plasmic-db
+         - CHOKIDAR_USEPOLLING=true
+         - DB_USER=${DB_USER}
+         - DB_PASSWORD=${DB_PASSWORD}
+         - DB_NAME=${DB_NAME}
+         - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+         - SESSION_SECRET=${SESSION_SECRET}
+         - HOST=${PUBLIC_URL}
+         - PUBLIC_URL=${PUBLIC_URL}
+         - STATIC_URL=${STATIC_URL}
+         - REACT_APP_DEV_HOST_PROXY=${REACT_APP_DEV_HOST_PROXY}
+         - BACKEND_HOST=${PUBLIC_URL}
+         - NEXT_PUBLIC_HOST=${PUBLIC_URL}
+      tty: true
+      stdin_open: true
 
 volumes:
-  postgres_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/plasmic/postgres_data
+   postgres_data:
+      driver: local
+      driver_opts:
+         type: none
+         o: bind
+         device: /mnt/data/plasmic/postgres_data
