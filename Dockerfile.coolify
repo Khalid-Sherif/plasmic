@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     jq
 
 # Enable yarn via corepack (explicitly using 1.22.22 to avoid Yarn 4 Berry plugin issues)
-RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+RUN RUN corepack enable && corepack prepare yarn@1.22.22 --activate && corepack prepare pnpm@11.8.0 --activate
 
 # Bypass Corepack strict mode so it ignores the "packageManager": "pnpm" field in package.json
 ENV COREPACK_ENABLE_STRICT=0
@@ -89,10 +89,15 @@ CMD ["sh", "-c", "\
     echo \"DATABASE_URI=postgres://$DB_USER:$DB_PASSWORD@plasmic-db:5432/$DB_NAME\" > .env && \
     echo \"WAB_DBNAME=$DB_NAME\" >> .env && \
     echo \"WAB_DBPASSWORD=$DB_PASSWORD\" >> .env && \
-    echo \"NODE_ENV=development\" >> .env && \
+    echo \"NODE_ENV=production\" >> .env && \
     echo \"PUBLIC_URL=$PUBLIC_URL\" >> .env && \
     yarn typeorm migration:run && \
     yarn seed && \
-    cd /plasmic && \
-    PUBLIC_URL=$PUBLIC_URL yarn dev \
+    export NODE_ENV=production && \
+    cd /plasmic/platform/wab && \
+    export REACT_APP_DEV_PROXY=$PUBLIC_URL && \
+    NODE_ENV=production PUBLIC_URL=$PUBLIC_URL bash tools/dev-server.bash build && \
+    ( cd build && npx -p local-web-server ws --spa index.html --port 3003 --cors.origin '*' --rewrite \"/api/(.*) -> http://localhost:3004/api/\\$1\" ) & \
+    bash tools/host-server.bash & \
+    NODE_ENV=production bash tools/backend-server.bash \
 "]
