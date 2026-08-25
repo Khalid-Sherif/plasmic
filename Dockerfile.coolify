@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     jq
 
 # Enable yarn via corepack (explicitly using 1.22.22 to avoid Yarn 4 Berry plugin issues)
-RUN RUN corepack enable && corepack prepare yarn@1.22.22 --activate && corepack prepare pnpm@11.8.0 --activate
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate && corepack prepare pnpm@11.8.0 --activate
 
 # Bypass Corepack strict mode so it ignores the "packageManager": "pnpm" field in package.json
 ENV COREPACK_ENABLE_STRICT=0
