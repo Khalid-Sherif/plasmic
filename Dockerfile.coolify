@@ -98,7 +98,7 @@ CMD ["sh", "-c", "\
     export NODE_ENV=production && \
     export REACT_APP_DEV_PROXY=$PUBLIC_URL && \
     PUBLIC_URL=$PUBLIC_URL bash tools/dev-server.bash build && \
-    bash -c \"cd build && npx -p local-web-server ws --spa index.html --port 3003 --cors.origin '*' --rewrite '/api/(.*) -> http://localhost:3004/api/\\$1'\" & \
+    ( cd build && npx -p local-web-server ws --spa index.html --port 3003 --cors.origin '*' --rewrite '/api/(.*) -> http://localhost:3004/api/\$1' & ) ; \
     bash tools/host-server.bash & \
     bash tools/backend-server.bash \
 "]
