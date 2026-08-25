@@ -92,7 +92,6 @@ CMD ["sh", "-c", "\
     echo \"NODE_ENV=production\" >> .env && \
     echo \"PUBLIC_URL=$PUBLIC_URL\" >> .env && \
     yarn typeorm migration:run && \
-    yarn seed && \
     export NODE_ENV=production && \
     cd /plasmic/platform/wab && \
     export NODE_ENV=production && \
