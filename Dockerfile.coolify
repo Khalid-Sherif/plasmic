@@ -97,6 +97,12 @@ CMD ["sh", "-c", "\
     export NODE_ENV=production && \
     export REACT_APP_DEV_PROXY=$PUBLIC_URL && \
     export STATIC_URL=$STATIC_URL && \
+    export POSTHOG_HOST=$POSTHOG_HOST && \
+    export POSTHOG_REVERSE_PROXY_HOST=$POSTHOG_REVERSE_PROXY_HOST && \
+    export SENTRY_DSN=$SENTRY_DSN && \
+    export SENTRY_ORG_ID=$SENTRY_ORG_ID && \
+    export SENTRY_PROJECT_ID=$SENTRY_PROJECT_ID && \
+    export STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY && \
     PUBLIC_URL=$PUBLIC_URL bash tools/dev-server.bash build && \
     ( cd build && npx -p local-web-server ws --spa index.html --port 3003 --cors.origin '*' --rewrite '/api/(.*) -> http://localhost:3004/api/$1' & ) ; \
     bash tools/host-server.bash & \
