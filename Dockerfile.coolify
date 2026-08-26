@@ -106,7 +106,7 @@ CMD ["sh", "-c", "\
     export STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY && \
     pnpm build-css && \
     PUBLIC_URL=$PUBLIC_URL bash tools/dev-server.bash build && \
-    ( node tools/serve-prod.js & ) ; \
+    ( BUILD_DIR=$(pwd)/build node tools/serve-prod.js & ) ; \
     bash tools/host-server.bash & \
     bash tools/backend-server.bash \
 "]
