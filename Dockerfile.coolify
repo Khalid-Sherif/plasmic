@@ -106,7 +106,7 @@ CMD ["sh", "-c", "\
     export STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY && \
     pnpm build-css && \
     PUBLIC_URL=$PUBLIC_URL bash tools/dev-server.bash build && \
-    ( cd build && npx -p local-web-server ws --spa index.html --port 3003 --cors.origin '*' --rewrite '/api/(.*) -> http://localhost:3004/api/$1' & ) ; \
+    ( node tools/serve-prod.js & ) ; \
     bash tools/host-server.bash & \
     bash tools/backend-server.bash \
 "]
