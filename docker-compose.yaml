@@ -86,16 +86,15 @@ volumes:
          o: bind
          device: /mnt/data/plasmic/postgres_data
 
-   volumes:
-      garage_meta:
-         driver: local
-         driver_opts:
-            type: none
-            o: bind
-            device: /mnt/data/plasmic/garage/meta
-      garage_data:
-         driver: local
-         driver_opts:
-            type: none
-            o: bind
-            device: /mnt/data/plasmic/garage/data
+   garage_meta:
+      driver: local
+      driver_opts:
+         type: none
+         o: bind
+         device: /mnt/data/plasmic/garage/meta
+   garage_data:
+      driver: local
+      driver_opts:
+         type: none
+         o: bind
+         device: /mnt/data/plasmic/garage/data
