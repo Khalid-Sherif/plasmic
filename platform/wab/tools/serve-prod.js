@@ -11,6 +11,10 @@ const path = require("path");
 const url = require("url");
 const zlib = require("zlib");
 
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception in serve-prod.js (continuing):", err);
+});
+
 const PORT = process.env.PORT || 3003;
 const BACKEND = process.env.BACKEND_URL || "http://localhost:3004";
 const BUILD_DIR = process.env.BUILD_DIR || path.join(__dirname, "build");
@@ -23,10 +27,16 @@ proxy.on("proxyReq", (proxyReq) => {
 
 proxy.on("error", (err, req, res) => {
   console.error("Proxy error:", err.message);
-  if (!res.headersSent) {
-    res.writeHead(502, { "Content-Type": "text/plain" });
+  // For WebSocket upgrades, `res` is a raw net.Socket (no writeHead/headersSent).
+  // For normal HTTP requests, it's a ServerResponse. Handle both without crashing.
+  if (res && typeof res.writeHead === "function") {
+    if (!res.headersSent) {
+      res.writeHead(502, { "Content-Type": "text/plain" });
+    }
+    res.end("Bad gateway");
+  } else if (res && typeof res.destroy === "function") {
+    res.destroy();
   }
-  res.end("Bad gateway");
 });
 
 const MIME = {
