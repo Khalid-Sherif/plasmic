@@ -63,18 +63,20 @@ services:
       tty: true
       stdin_open: true
 
-   minio:
-      image: minio/minio:latest
+   garage:
+      image: dxflrs/garage:v2.3.0
       restart: always
-      command: server /data --console-address ":9001"
+      command: ["--single-node", "--default-access-key", "--default-bucket"]
       environment:
-         - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-         - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      ports:
-         - 9010:9000
-         - 9011:9001
+         - GARAGE_DEFAULT_ACCESS_KEY=${GARAGE_ACCESS_KEY}
+         - GARAGE_DEFAULT_SECRET_KEY=${GARAGE_SECRET_KEY}
+         - GARAGE_DEFAULT_BUCKET=plasmic-assets
       volumes:
-         - minio_data:/data
+         - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml
+         - garage_meta:/var/lib/garage/meta
+         - garage_data:/var/lib/garage/data
+      ports:
+         - 9010:3900
 
 volumes:
    postgres_data:
@@ -84,9 +86,16 @@ volumes:
          o: bind
          device: /mnt/data/plasmic/postgres_data
 
-   minio_data:
-      driver: local
-      driver_opts:
-         type: none
-         o: bind
-         device: /mnt/data/plasmic/minio_data
+   volumes:
+      garage_meta:
+         driver: local
+         driver_opts:
+            type: none
+            o: bind
+            device: /mnt/data/plasmic/garage/meta
+      garage_data:
+         driver: local
+         driver_opts:
+            type: none
+            o: bind
+            device: /mnt/data/plasmic/garage/data
