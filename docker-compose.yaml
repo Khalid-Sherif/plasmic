@@ -78,6 +78,16 @@ services:
       ports:
          - 9010:3900
 
+   garage-webui:
+      image: khairul169/garage-webui:latest
+      restart: always
+      environment:
+         - CONFIG_PATH=/etc/garage.toml
+      volumes:
+         - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml:ro
+      ports:
+         - 9011:3909
+
 volumes:
    postgres_data:
       driver: local
