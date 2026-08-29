@@ -72,7 +72,7 @@ services:
       environment:
          - GARAGE_DEFAULT_ACCESS_KEY=${GARAGE_ACCESS_KEY}
          - GARAGE_DEFAULT_SECRET_KEY=${GARAGE_SECRET_KEY}
-         - GARAGE_DEFAULT_BUCKET=plasmic-assets
+         - GARAGE_DEFAULT_BUCKET=assets
       volumes:
          - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml
          - garage_meta:/var/lib/garage/meta
@@ -92,7 +92,7 @@ services:
       volumes:
          - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml:ro
       ports:
-         - 9011:3000
+         - 9011:3909
 
 networks:
    garage-net:
