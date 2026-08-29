@@ -66,6 +66,8 @@ services:
    garage:
       image: dxflrs/garage:v2.3.0
       restart: always
+      networks:
+         - garage-net
       command: ["/garage", "server", "--single-node", "--default-access-key", "--default-bucket"]
       environment:
          - GARAGE_DEFAULT_ACCESS_KEY=${GARAGE_ACCESS_KEY}
@@ -77,16 +79,24 @@ services:
          - garage_data:/var/lib/garage/data
       ports:
          - 9010:3900
+         - 9012:3902
 
    garage-webui:
       image: khairul169/garage-webui:latest
       restart: always
+      networks:
+         - garage-net
       environment:
          - CONFIG_PATH=/etc/garage.toml
+         - GARAGE_API_URL=http://garage:3903
       volumes:
          - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml:ro
       ports:
-         - 9011:3909
+         - 9011:3000
+
+networks:
+   garage-net:
+      driver: bridge
 
 volumes:
    postgres_data:
