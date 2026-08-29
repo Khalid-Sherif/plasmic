@@ -68,6 +68,7 @@ export async function uploadFileToS3(
   try {
     const { Location } = await new S3({
       endpoint: process.env.S3_ENDPOINT,
+      s3ForcePathStyle: !!process.env.S3_ENDPOINT,
     })
       .upload({
         Bucket: siteAssetsBucket,
