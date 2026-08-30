@@ -89,6 +89,7 @@ services:
       environment:
          - CONFIG_PATH=/etc/garage.toml
          - API_BASE_URL=http://garage:3903
+         - ADMIN_TOKEN=${GARAGE_ADMIN_TOKEN}
       volumes:
          - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml:ro
       ports:
