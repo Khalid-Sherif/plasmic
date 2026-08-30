@@ -88,7 +88,7 @@ services:
          - garage-net
       environment:
          - CONFIG_PATH=/etc/garage.toml
-         - GARAGE_API_URL=http://garage:3903
+         - API_BASE_URL=http://garage:3903
       volumes:
          - /mnt/data/plasmic/garage/garage.toml:/etc/garage.toml:ro
       ports:
