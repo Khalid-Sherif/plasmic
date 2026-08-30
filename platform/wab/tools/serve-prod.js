@@ -1,23 +1,21 @@
 // Static file server + /api proxy for the Plasmic frontend build.
-// Replaces `local-web-server`, which wasn't reliably forwarding
-// X-Forwarded-Proto to the backend (breaking secure-cookie/CSRF handling).
-// This version adds gzip compression and cache headers, which the
-// earlier minimal version was missing -- without them, every project
-// load re-downloaded tens of MB of uncompressed, uncached JS.
+// Also implements a self-hosted replacement for Plasmic's cloud
+// img-optimizer service (img.plasmic.app), since the studio canvas
+// hardcodes image rendering through that endpoint regardless of
+// where the actual asset is stored.
 const http = require("http");
+const https = require("https");
 const httpProxy = require("http-proxy");
 const fs = require("fs");
 const path = require("path");
 const url = require("url");
 const zlib = require("zlib");
-
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception in serve-prod.js (continuing):", err);
-});
+const sharp = require("sharp");
 
 const PORT = process.env.PORT || 3003;
 const BACKEND = process.env.BACKEND_URL || "http://localhost:3004";
 const BUILD_DIR = process.env.BUILD_DIR || path.join(__dirname, "build");
+const SITE_ASSETS_BASE_URL = process.env.SITE_ASSETS_BASE_URL || "";
 
 const proxy = httpProxy.createProxyServer({ target: BACKEND, ws: true });
 
@@ -27,8 +25,6 @@ proxy.on("proxyReq", (proxyReq) => {
 
 proxy.on("error", (err, req, res) => {
   console.error("Proxy error:", err.message);
-  // For WebSocket upgrades, `res` is a raw net.Socket (no writeHead/headersSent).
-  // For normal HTTP requests, it's a ServerResponse. Handle both without crashing.
   if (res && typeof res.writeHead === "function") {
     if (!res.headersSent) {
       res.writeHead(502, { "Content-Type": "text/plain" });
@@ -93,11 +89,112 @@ function serveFile(filePath, req, res) {
   });
 }
 
+// Fetches a URL (http or https) and returns a Buffer.
+function fetchBuffer(targetUrl) {
+  return new Promise((resolve, reject) => {
+    const lib = targetUrl.startsWith("https:") ? https : http;
+    lib
+      .get(targetUrl, (res) => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`Upstream fetch failed: ${res.statusCode}`));
+          res.resume();
+          return;
+        }
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+      })
+      .on("error", reject);
+  });
+}
+
+const FORMAT_TO_MIME = {
+  webp: "image/webp",
+  png: "image/png",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  avif: "image/avif",
+};
+
+async function handleImgOptimizer(req, res, pathname, query) {
+  try {
+    let sourceUrl;
+
+    if (query.src) {
+      // Query mode: fetch an arbitrary src URL, then transform.
+      sourceUrl = query.src;
+    } else {
+      // Path mode: /img-optimizer/v1/img/<filename> -- raw passthrough
+      // from our own asset storage.
+      const filename = pathname.replace(/^\/img-optimizer\/v1\/img\//, "");
+      if (!SITE_ASSETS_BASE_URL) {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end("SITE_ASSETS_BASE_URL not configured");
+        return;
+      }
+      sourceUrl = SITE_ASSETS_BASE_URL + filename;
+    }
+
+    const inputBuffer = await fetchBuffer(sourceUrl);
+
+    // If no transform params given, just pass the bytes through as-is.
+    if (!query.q && !query.f && !query.w && !query.h) {
+      res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "public, max-age=31536000, immutable",
+      });
+      res.end(inputBuffer);
+      return;
+    }
+
+    let pipeline = sharp(inputBuffer);
+
+    const width = query.w ? parseInt(query.w, 10) : undefined;
+    const height = query.h ? parseInt(query.h, 10) : undefined;
+    if (width || height) {
+      pipeline = pipeline.resize(width || null, height || null, {
+        fit: "inside",
+        withoutEnlargement: true,
+      });
+    }
+
+    const format = (query.f || "webp").toLowerCase();
+    const quality = query.q ? parseInt(query.q, 10) : 75;
+
+    if (format === "webp") {
+      pipeline = pipeline.webp({ quality });
+    } else if (format === "png") {
+      pipeline = pipeline.png({ quality });
+    } else if (format === "avif") {
+      pipeline = pipeline.avif({ quality });
+    } else {
+      pipeline = pipeline.jpeg({ quality });
+    }
+
+    const outputBuffer = await pipeline.toBuffer();
+
+    res.writeHead(200, {
+      "Content-Type": FORMAT_TO_MIME[format] || "application/octet-stream",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    });
+    res.end(outputBuffer);
+  } catch (err) {
+    console.error("img-optimizer error:", err.message);
+    res.writeHead(502, { "Content-Type": "text/plain" });
+    res.end("Image optimization failed");
+  }
+}
+
 const server = http.createServer((req, res) => {
-  const parsed = url.parse(req.url);
+  const parsed = url.parse(req.url, true);
 
   if (parsed.pathname.startsWith("/api")) {
     proxy.web(req, res);
+    return;
+  }
+
+  if (parsed.pathname.startsWith("/img-optimizer/v1/img")) {
+    handleImgOptimizer(req, res, parsed.pathname, parsed.query);
     return;
   }
 
@@ -113,6 +210,6 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(
-    `Serving ${BUILD_DIR} on :${PORT}, proxying /api -> ${BACKEND} (gzip + cache headers enabled)`
+    `Serving ${BUILD_DIR} on :${PORT}, proxying /api -> ${BACKEND}, img-optimizer enabled`
   );
 });
