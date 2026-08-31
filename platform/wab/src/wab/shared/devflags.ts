@@ -425,7 +425,7 @@ const DEFAULT_DEVFLAGS = {
   usePlasmicImg: false,
   usePlasmicTranslation: false,
   showPlasmicImgModal: false,
-  imgOptimizerHost: "https://img.plasmic.app",
+  imgOptimizerHost: "https://plasmic.atheta.net",
   introYoutubeId: "K_YzFBd7b2I",
   noFlipTags: true,
   revisionNum: undefined,

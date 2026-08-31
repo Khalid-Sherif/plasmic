@@ -1,3 +1,5 @@
 Dockerfile.coolify text eol=lf
 serve-prod.js text eol=lf
 platform\wab\src\wab\server\cdn\images.ts text eol=lf
+platform\wab\src\wab\shared\devflags.ts text eol=lf
+platform\wab\src\wab\server\db\RestoreInstallables.ts text eol=lf
