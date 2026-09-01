@@ -22,7 +22,7 @@ type ImgTagProps = Omit<
   "src" | "srcSet" | "ref" | "style"
 >;
 
-const IMG_OPTIMIZER_HOST = "https://img.plasmic.app";
+const IMG_OPTIMIZER_HOST = "https://plasmic.atheta.net";
 
 // Default image sizes to snap to
 // TODO: make this configurable?
