@@ -60,6 +60,7 @@ RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
 
 RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
 RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
+RUN sed -i 's|https://img.plasmic.app|https://plasmic.atheta.net|g' /plasmic/platform/wab/node_modules/@plasmicapp/react-web/skinny/dist/render/PlasmicImg/index.js
 
 # --- Final stage ---
 FROM node:24-alpine AS runtime
