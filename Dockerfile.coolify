@@ -58,9 +58,9 @@ RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
     yarn setup:canvas-packages && \
     PUBLIC_URL=${PUBLIC_URL} yarn make
 
-RUN cd /plasmic/platform/wab && yarn add raw-loader --dev
-RUN cd /plasmic/platform/wab && yarn add @rsbuild/plugin-node-polyfill --dev
 RUN find /plasmic -path '*node_modules/@plasmicapp/react-web*' -name '*.js' -exec sed -i 's|https://img.plasmic.app|https://plasmic.atheta.net|g' {} \;
+RUN cd /plasmic/platform/react-web-bundle && yarn build
+RUN cd /plasmic/platform/canvas-packages && yarn build
 
 # --- Final stage ---
 FROM node:24-alpine AS runtime
