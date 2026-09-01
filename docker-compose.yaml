@@ -62,6 +62,9 @@ services:
          - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
       tty: true
       stdin_open: true
+      networks:
+         - default
+         - stalwart-net
 
    garage:
       image: dxflrs/garage:v2.3.0
@@ -95,9 +98,14 @@ services:
       ports:
          - 9011:3909
 
+
 networks:
    garage-net:
       driver: bridge
+
+   stalwart-net:
+      external: true
+      name: e0s00o8g044c48gc0sswgo04
 
 volumes:
    postgres_data:
