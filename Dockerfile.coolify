@@ -86,7 +86,7 @@ EXPOSE 3003 3004 3005
 
 CMD ["sh", "-c", "\
     mkdir -p /home/plasmic/.plasmic && \
-    echo '{\"encryptionKey\":\"'\"$ENCRYPTION_KEY\"'\",\"resendApiKey\":\"'\"$RESEND_API_KEY\"'\",\"smtpAuth\":{\"user\":\"'\"$SMTP_USER\"'\",\"pass\":\"'\"$SMTP_PASS\"'\"}}' > /home/plasmic/.plasmic/secrets.json
+    node -e "require('fs').writeFileSync('/home/plasmic/.plasmic/secrets.json', JSON.stringify({encryptionKey: process.env.ENCRYPTION_KEY, resendApiKey: process.env.RESEND_API_KEY, smtpAuth: {user: process.env.SMTP_USER, pass: process.env.SMTP_PASS}}))" && \
     cd /plasmic/platform/wab && \
     jq '(.host = \"plasmic-db\") | (.password = \"'\"$DB_PASSWORD\"'\") | (.username = \"'\"$DB_USER\"'\") | (.database = \"'\"$DB_NAME\"'\")' ormconfig.json > tmp.json && mv tmp.json ormconfig.json && \
     echo \"DATABASE_URI=postgres://$DB_USER:$DB_PASSWORD@plasmic-db:5432/$DB_NAME\" > .env && \
