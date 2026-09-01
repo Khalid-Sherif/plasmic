@@ -64,9 +64,7 @@ services:
       stdin_open: true
       networks:
          - default
-         - stalwart-net:
-            aliases:
-               - stalwart
+         - stalwart-net
 
    garage:
       image: dxflrs/garage:v2.3.0
