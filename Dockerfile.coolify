@@ -35,8 +35,6 @@ COPY . .
 # Create a fake git repo so rsbuild.config.ts can run git rev-parse HEAD
 RUN git init && git config --global user.email "build@plasmic.app" && git config --global user.name "Build" && git add -A && git commit -m "build" --allow-empty
 
-ARG PUBLIC_URL
-ENV PUBLIC_URL=${PUBLIC_URL}
 ARG REACT_APP_DEFAULT_HOST_URL
 ENV REACT_APP_DEFAULT_HOST_URL=${REACT_APP_DEFAULT_HOST_URL}
 
@@ -48,6 +46,8 @@ ENV PUPPETEER_SKIP_DOWNLOAD=1
 # Use the package.json scripts.
 # Because we updated them in Step 1, they now use 'yarn' with --prefer-offline,
 # single-threaded network concurrency, and built-in 10-minute network timeouts.
+ARG PUBLIC_URL
+ENV PUBLIC_URL=${PUBLIC_URL}
 RUN echo "PUBLIC_URL is: $PUBLIC_URL" && \
     PUBLIC_URL=${PUBLIC_URL} yarn setup:sub && \
     yarn setup:react-web-bundle && \
