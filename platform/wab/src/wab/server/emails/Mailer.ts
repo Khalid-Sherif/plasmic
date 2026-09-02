@@ -77,8 +77,8 @@ export function createMailer(): Mailer {
     }
     return new NodeMailer(
       createTransport({
-        host: "email-smtp.us-west-2.amazonaws.com",
-        port: 587,
+        host: process.env.SMTP_HOST || "email-smtp.us-west-2.amazonaws.com",
+        port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
         auth: getSmtpAuth(),
       })
     );
