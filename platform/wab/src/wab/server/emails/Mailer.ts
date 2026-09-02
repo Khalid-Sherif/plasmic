@@ -80,6 +80,7 @@ export function createMailer(): Mailer {
         host: process.env.SMTP_HOST || "email-smtp.us-west-2.amazonaws.com",
         port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
         auth: getSmtpAuth(),
+        tls: { rejectUnauthorized: false },
       })
     );
   } else {
