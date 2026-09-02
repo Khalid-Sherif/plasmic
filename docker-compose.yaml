@@ -60,6 +60,7 @@ services:
          - SENTRY_ORG_ID=${SENTRY_ORG_ID}
          - SENTRY_PROJECT_ID=${SENTRY_PROJECT_ID}
          - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+         - MAIL_CONFIG=${MAIL_CONFIG}
       tty: true
       stdin_open: true
       networks:
